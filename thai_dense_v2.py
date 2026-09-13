@@ -28,6 +28,24 @@ MODEL_PROFILES: dict[str, dict[str, Any]] = {
         "query_prefix": "query: ",
         "document_prefix": "query: ",
     },
+    "embeddinggemma-300m": {
+        "model_id": "google/embeddinggemma-300m",
+        "trust_remote_code": False,
+        "query_prefix": "",
+        "document_prefix": "",
+        "query_method": "encode_query",
+        "document_method": "encode_document",
+        "truncate_dim": None,
+    },
+    "embeddinggemma-300m-256": {
+        "model_id": "google/embeddinggemma-300m",
+        "trust_remote_code": False,
+        "query_prefix": "",
+        "document_prefix": "",
+        "query_method": "encode_query",
+        "document_method": "encode_document",
+        "truncate_dim": 256,
+    },
     "gte-base-experimental": {
         "model_id": "Alibaba-NLP/gte-multilingual-base",
         "trust_remote_code": True,
@@ -149,10 +167,45 @@ def load_model(profile: dict[str, Any], device: str | None = None):
     kwargs: dict[str, Any] = {
         "trust_remote_code": bool(profile.get("trust_remote_code", False)),
     }
+    truncate_dim = profile.get("truncate_dim")
+    if truncate_dim is not None:
+        kwargs["truncate_dim"] = int(truncate_dim)
+
     effective_device = resolve_device(device)
     if effective_device:
         kwargs["device"] = effective_device
     return SentenceTransformer(profile["model_id"], **kwargs)
+
+
+def _encode_documents(
+    encoder: Any,
+    profile: dict[str, Any],
+    texts: list[str],
+    *,
+    batch_size: int,
+) -> np.ndarray:
+    method_name = str(profile.get("document_method", "encode"))
+    if method_name == "encode_document":
+        vectors = encoder.encode_document(
+            texts,
+            batch_size=batch_size,
+            show_progress_bar=True,
+            convert_to_numpy=True,
+            normalize_embeddings=True,
+        )
+    else:
+        documents = _prepare_texts(
+            texts,
+            prefix=str(profile.get("document_prefix", "")),
+        )
+        vectors = encoder.encode(
+            documents,
+            batch_size=batch_size,
+            show_progress_bar=True,
+            convert_to_numpy=True,
+            normalize_embeddings=True,
+        )
+    return np.asarray(vectors, dtype=np.float32)
 
 
 def build_dense_index(
@@ -169,20 +222,14 @@ def build_dense_index(
     load_seconds = perf_counter() - load_started
 
     texts = [sense_text(artifacts, sense_id) for sense_id in range(len(artifacts.senses))]
-    documents = _prepare_texts(
-        texts,
-        prefix=str(profile.get("document_prefix", "")),
-    )
 
     encode_started = perf_counter()
-    embeddings = encoder.encode(
-        documents,
+    embeddings = _encode_documents(
+        encoder,
+        profile,
+        texts,
         batch_size=batch_size,
-        show_progress_bar=True,
-        convert_to_numpy=True,
-        normalize_embeddings=True,
     )
-    embeddings = np.asarray(embeddings, dtype=np.float32)
     encode_seconds = perf_counter() - encode_started
 
     out = Path(output_dir)
@@ -196,6 +243,9 @@ def build_dense_index(
         "trust_remote_code": bool(profile.get("trust_remote_code", False)),
         "query_prefix": profile.get("query_prefix", ""),
         "document_prefix": profile.get("document_prefix", ""),
+        "query_method": profile.get("query_method", "encode"),
+        "document_method": profile.get("document_method", "encode"),
+        "truncate_dim": profile.get("truncate_dim"),
         "normalized": True,
         "rows": int(embeddings.shape[0]),
         "dimensions": int(embeddings.shape[1]),
@@ -245,11 +295,24 @@ class DenseEncoder:
             "trust_remote_code": bool(metadata.get("trust_remote_code", False)),
             "query_prefix": metadata.get("query_prefix", ""),
             "document_prefix": metadata.get("document_prefix", ""),
+            "query_method": metadata.get("query_method", "encode"),
+            "document_method": metadata.get("document_method", "encode"),
+            "truncate_dim": metadata.get("truncate_dim"),
         }
         self.model = load_model(profile, device=device)
 
     def encode_query(self, text: str) -> np.ndarray:
         text = normalize_text(text)
+        method_name = str(self.metadata.get("query_method", "encode"))
+        if method_name == "encode_query":
+            vector = self.model.encode_query(
+                text,
+                convert_to_numpy=True,
+                normalize_embeddings=True,
+                show_progress_bar=False,
+            )
+            return np.asarray(vector, dtype=np.float32)
+
         prefix = str(self.metadata.get("query_prefix", ""))
         prepared = f"{prefix}{text}" if prefix else text
         vector = self.model.encode(
