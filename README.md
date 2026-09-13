@@ -222,6 +222,43 @@ python -m unittest discover -s tests
 
 test นี้ไม่ต้องโหลดพจนานุกรมเต็ม และตรวจว่า default search ใช้ sense 1 ขณะที่ `--sense 2` เปลี่ยน semantic neighborhood ได้จริง
 
+## Evaluation หลายกลุ่มคำ
+
+หลังจากคำว่า `ฝน` ผ่านเกณฑ์เชิงโครงสร้างแล้ว ไม่ควรจูนต่อจากคำเดียว เพราะเสี่ยง overfit
+
+สาขานี้มีชุดประเมินเล็ก ๆ ที่ครอบคลุม noun / verb / adjective / emotion:
+
+```text
+evaluation/v1_queries.json
+```
+
+รันได้ด้วย:
+
+```bash
+python scripts/evaluate.py --index artifacts/v1 --top-k 10
+```
+
+ถ้าต้องการบันทึกผลเป็น JSON เพื่อเปรียบเทียบก่อน/หลังการแก้ ranking:
+
+```bash
+python scripts/evaluate.py \
+  --index artifacts/v1 \
+  --top-k 10 \
+  --output evaluation/latest_report.json
+```
+
+รายงานจะแสดงต่อ query:
+
+- category
+- requested / selected sense
+- senses ทั้งหมดที่พจนานุกรมมี
+- จำนวนผลลัพธ์แยกตาม relation tier
+- top results พร้อม definition, relation hint, lexical form และ signals
+
+สำหรับ query ที่ `sense: null` ให้ตรวจ `selected_sense` ก่อนตัดสินคุณภาพผลลัพธ์ หาก sense 1 ของพจนานุกรมไม่ใช่ความหมายที่ต้องการ ให้ใส่หมายเลข sense ที่เหมาะสมลงใน `evaluation/v1_queries.json` แล้วรันใหม่
+
+เป้าหมายของรอบนี้คือดูว่า ranking architecture ใช้ได้ทั่วไป ไม่ใช่บังคับให้ทุก query มีคำตอบตามรายการที่เขียนไว้ล่วงหน้า
+
 ## ทรัพยากรเป้าหมาย
 
 สำหรับประมาณ 50,000 records:
