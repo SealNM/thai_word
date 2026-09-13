@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import numpy as np
 
-from thai_dense_v2 import DenseArtifacts
+from thai_dense_v2 import DenseArtifacts, resolve_device
 from thai_hybrid_v2 import HybridSearcher, lexical_relation_weight, weighted_rrf
 from thai_lexical_v1 import SearchArtifacts
 
@@ -71,6 +71,13 @@ class HybridV2Tests(unittest.TestCase):
     def test_weighted_rrf_is_scale_independent(self) -> None:
         score = weighted_rrf(lexical_rank=1, dense_rank=1, k=60)
         self.assertAlmostEqual(score, 2 / 61)
+
+    @patch("torch.cuda.is_available", return_value=False)
+    def test_cuda_request_falls_back_to_cpu(self, mocked_cuda) -> None:
+        with self.assertWarns(RuntimeWarning):
+            device = resolve_device("cuda")
+        self.assertEqual(device, "cpu")
+        mocked_cuda.assert_called_once()
 
     @patch("thai_hybrid_v2.lexical_search")
     def test_dense_can_promote_semantic_candidate_but_not_beat_direct_alias(
