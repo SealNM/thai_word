@@ -6,7 +6,7 @@ import numpy as np
 from scipy import sparse
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-from thai_lexical_v1 import SearchArtifacts, search, split_tokens
+from thai_lexical_v1 import SearchArtifacts, _reference_strength, search, split_tokens
 
 
 class SenseAwareSearchTests(unittest.TestCase):
@@ -103,6 +103,24 @@ class SenseAwareSearchTests(unittest.TestCase):
     def test_out_of_range_sense_is_rejected(self) -> None:
         with self.assertRaises(ValueError):
             search(self.artifacts, "ฝน", sense=3)
+
+    def test_reference_strength_prefers_direct_gloss(self) -> None:
+        direct = _reference_strength("ฝน.", "ฝน")
+        alternative = _reference_strength("เมฆ, ฝน.", "ฝน")
+        subtype = _reference_strength("ฝนเม็ดใหญ่ที่ตกลงมาแรง", "ฝน")
+        contextual = _reference_strength("หอบไป เช่น เมฆอุ้มฝน.", "ฝน")
+        associated = _reference_strength("เทวดาแห่งฝน.", "ฝน")
+
+        self.assertGreater(direct, alternative)
+        self.assertGreater(alternative, subtype)
+        self.assertGreater(subtype, contextual)
+        self.assertGreater(contextual, associated)
+
+    def test_direct_gloss_uses_synonym_relation_hint(self) -> None:
+        results = search(self.artifacts, "ฝน", top_k=3, candidate_pool=4)
+        pirun = next(item for item in results if item["word"] == "พิรุณ")
+        self.assertEqual(pirun["relation_hint"], "direct_gloss_or_synonym")
+        self.assertGreaterEqual(pirun["signals"]["reverse_reference"], 0.9)
 
 
 if __name__ == "__main__":
