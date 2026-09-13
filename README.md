@@ -62,16 +62,21 @@ V1 เก็บ headword เดียวเป็น entry เดียวเพ
    - นิยามชนิดย่อย เช่น `ฝนเม็ดใหญ่...` = type-of relation
    - mention ในตัวอย่าง เช่น `เช่น เมฆอุ้มฝน` = contextual relation
    - mention เชิงเกี่ยวข้อง เช่น `เทวดาแห่งฝน` = associated relation
-10. จัดอันดับ baseline จาก:
-   - definition cosine similarity 35%
-   - reverse definitional reference strength 40%
-   - forward definition-component reference strength 3%
-   - shared definition tokens 17%
-   - word-form similarity 5%
+10. จัดอันดับ exact-headword query แบบ hierarchical relation tier:
+   - Tier 5: direct gloss / synonym เช่น `ฝน.`
+   - Tier 4: alternative direct gloss เช่น `เมฆ, ฝน.`
+   - Tier 3: subtype / kind-of เช่น `ฝนเม็ดใหญ่...`
+   - Tier 2: contextual / associated mention
+   - Tier 1: คำที่ถูกกล่าวถึงในนิยามของ query
+   - Tier 0: definition similarity อย่างเดียว
+11. cosine / shared tokens / word-form ใช้เป็น **ตัวตัดสินภายใน tier** ไม่ให้ similarity ที่สูงกว่าข้ามชนิดความสัมพันธ์ที่แข็งแรงกว่าได้
+12. headword ที่ขึ้นต้นหรือลงท้ายด้วย `-` ถือเป็น bound form และลดลง 1 tier แทนการลบทิ้ง เพื่อยังคงค้นเจอข้อมูลทางศัพท์ได้
 
-จุดสำคัญคือ reverse reference (candidate นิยามตัวเองด้วย query) มีน้ำหนักสูงกว่า forward reference (นิยาม query กล่าวถึง candidate) มาก เพื่อไม่ให้คำอย่าง `เมฆ` หรือ `เม็ด` ถูกมองเท่าคำพ้องของ `ฝน`
+ตัวอย่าง: `พิรุณ = ฝน.` จะต้องอยู่เหนือ `พลาหก = เมฆ, ฝน.` เสมอ แม้ `พลาหก` จะมี cosine/shared tokens สูงกว่า และ `พรรษ-` จะต่ำกว่า `พรรษ` ในฐานะรูปประกอบคำ
 
-น้ำหนักทั้งหมดเป็น baseline และตั้งใจให้ปรับจาก evaluation set ภายหลัง
+สำหรับ query ที่ไม่ตรง headword ในพจนานุกรม ระบบยัง fallback ไปใช้ semantic similarity จาก definition เป็นหลัก
+
+น้ำหนักและ tier เหล่านี้ยังเป็น baseline และตั้งใจให้ปรับจาก evaluation set ภายหลัง
 
 ## ติดตั้ง
 
@@ -154,6 +159,8 @@ python scripts/search.py "พรำ" --index artifacts/v1 --top-k 20
 
 - score
 - relation hint
+- relation tier
+- lexical form (`standalone` / `bound_form`)
 - definition cosine
 - reverse reference strength
 - forward reference strength
