@@ -1,6 +1,149 @@
-# Thai Lexical Semantic V1
+# Thai Lexical Semantic V2
 
-Baseline สำหรับค้นหาคำภาษาไทยที่มีความหมายใกล้เคียงกันจาก **คำศัพท์ + ความหมายในพจนานุกรมเท่านั้น** โดยยังไม่ใช้ LLM, external embedding API, corpus ภายนอก หรือ GPU
+V2 ต่อจาก V1 โดยเก็บ lexical/sparse baseline เดิมไว้ทั้งหมด แล้วเพิ่ม **sense-level dense embeddings** เพื่อช่วยค้นคำที่ความหมายใกล้กันแม้นิยามใช้คนละถ้อยคำ โดยยังไม่ใช้ LLM หรือ external embedding API และยังออกแบบให้รันบน Google Colab ได้
+
+V1 ยังคงเป็น baseline ที่สำคัญสำหรับ direct dictionary relation, sense-aware TF-IDF และ lexical tiers ส่วน V2 เพิ่ม dense retrieval และรวมอันดับด้วย weighted Reciprocal Rank Fusion (RRF)
+
+## V2 architecture
+
+```text
+query + selected sense
+        │
+        ├── V1 lexical graph + TF-IDF
+        │
+        └── dense embedding search (sense-level)
+                    │
+                    ▼
+             candidate union
+                    │
+                    ▼
+          weighted RRF fusion
+                    │
+                    ▼
+              final ranking
+```
+
+หลักสำคัญ:
+
+- dense embedding สร้าง **ต่อ sense** ไม่ใช่ต่อ headword
+- direct lexical relations Tier 4–5 แบบ standalone ถูกปกป้องไว้เหนือ dense-only candidates
+- Tier 0–1 ไม่ได้ lexical-rank bonus ใน fusion เพื่อเปิดทางให้ dense semantic ช่วยแก้กรณีเช่น `พูด → เอ่ย`
+- Tier 2 ได้ lexical weight 0.25, Tier 3 ได้ 0.5, Tier 4–5 ได้ 1.0
+- ใช้ RRF เพื่อไม่ต้องเอา cosine ของ E5 กับ GTE ซึ่งมีสเกลต่างกันมาบวกตรง ๆ
+- V1 artifacts ไม่ต้อง rebuild เมื่อเปลี่ยน dense model
+
+Built-in dense models:
+
+| key | model | หมายเหตุ |
+| --- | --- | --- |
+| `e5-small` | `intfloat/multilingual-e5-small` | baseline เบา, 384 dimensions, symmetric `query:` prefix |
+| `gte-base` | `Alibaba-NLP/gte-multilingual-base` | challenger, 768 dimensions, `trust_remote_code=True` |
+
+E5 ใช้ `query:` ทั้ง query และ dictionary sense เพราะงานนี้เป็น semantic similarity / paraphrase-style retrieval มากกว่า asymmetric passage QA
+
+## Colab V2 quick start
+
+### 1) checkout V2
+
+```python
+!git clone -b feat/dictionary-semantic-v2 https://github.com/SealNM/thai_word.git
+%cd thai_word
+!pip install -r requirements.txt
+```
+
+ถ้า clone ไว้แล้ว:
+
+```python
+%cd /content/thai_word
+!git fetch origin
+!git checkout feat/dictionary-semantic-v2
+!git reset --hard origin/feat/dictionary-semantic-v2
+!pip install -r requirements.txt
+```
+
+### 2) build V1 lexical index
+
+ถ้ามี `artifacts/v1` จาก V1 ล่าสุดอยู่แล้วใช้ต่อได้เลย หากยังไม่มี:
+
+```python
+!rm -rf artifacts/v1
+!python scripts/build_index.py --output artifacts/v1
+```
+
+### 3) build E5 dense index
+
+```python
+!python scripts/build_dense_index.py \
+  --index artifacts/v1 \
+  --model e5-small \
+  --output artifacts/v2/e5-small \
+  --device cuda \
+  --batch-size 64
+```
+
+### 4) build GTE challenger
+
+```python
+!python scripts/build_dense_index.py \
+  --index artifacts/v1 \
+  --model gte-base \
+  --output artifacts/v2/gte-base \
+  --device cuda \
+  --batch-size 32
+```
+
+ถ้า Colab session ไม่มี GPU ให้เอา `--device cuda` ออก ระบบจะใช้ device ที่ Sentence Transformers เลือกให้
+
+### 5) ทดลอง hybrid search
+
+```python
+!python scripts/search_v2.py "พูด" \
+  --index artifacts/v1 \
+  --dense-index artifacts/v2/e5-small \
+  --top-k 20 \
+  --device cuda
+```
+
+ตัวอย่างเลือก sense:
+
+```python
+!python scripts/search_v2.py "รัก" \
+  --index artifacts/v1 \
+  --dense-index artifacts/v2/e5-small \
+  --sense 3 \
+  --top-k 20 \
+  --device cuda
+```
+
+### 6) benchmark V1 vs E5 vs GTE
+
+```python
+!python scripts/evaluate_v2.py \
+  --index artifacts/v1 \
+  --dense-index artifacts/v2/e5-small \
+  --dense-index artifacts/v2/gte-base \
+  --top-k 10 \
+  --device cuda \
+  --output evaluation/v2_report.json
+```
+
+evaluation set pin ความหมายของคำกำกวมไว้แล้ว เช่น `รัก = sense 3`, `สวย = sense 1`, `มืด = sense 1`, `บ้าน = sense 1` เพื่อให้การเทียบ dense model ไม่ถูกบิดจาก homonym ผิดความหมาย
+
+## V2 artifacts
+
+แต่ละ dense model เก็บแยก directory:
+
+```text
+artifacts/v2/e5-small/
+├── dense_embeddings.npy
+└── dense_metadata.json
+
+artifacts/v2/gte-base/
+├── dense_embeddings.npy
+└── dense_metadata.json
+```
+
+ตัว embedding เป็น normalized float32 และเรียงแถวตรงกับ `artifacts/v1/senses.json`
 
 ## Schema จริงที่ V1 ใช้เป็นค่าเริ่มต้น
 
@@ -172,12 +315,12 @@ python scripts/search.py "พรำ" --index artifacts/v1 --top-k 20
 - sense_count
 - source_ids
 
-## Google Colab
+## Google Colab V1 baseline
 
 ### Cell 1 — clone branch
 
 ```python
-!git clone -b feat/dictionary-semantic-v1 https://github.com/SealNM/thai_word.git
+!git clone -b feat/dictionary-semantic-v2 https://github.com/SealNM/thai_word.git
 %cd thai_word
 ```
 
@@ -278,7 +421,9 @@ python scripts/evaluate.py \
 
 - CPU: 2–4 vCPU ก็เริ่มได้
 - RAM: 4–8 GB เป้าหมายเริ่มต้น
-- GPU: ไม่ใช้
-- index: sparse TF-IDF ระดับ sense
+- V1 lexical: CPU-only
+- V2 dense build: GPU แนะนำแต่ไม่บังคับ
+- RAM: 4–8 GB ยังเป็นเป้าหมายเริ่มต้นสำหรับ V1; V2 ขึ้นกับโมเดลที่เลือก
+- index: sparse TF-IDF + dense sense embeddings
 
 ตัวเลขจริงจะวัดจากไฟล์เต็มหลัง build
