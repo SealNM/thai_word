@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from thai_lexical_v1 import (
     DEFAULT_DEFINITION_FIELD,
     DEFAULT_ID_FIELD,
+    DEFAULT_INPUT_PATH,
     DEFAULT_WORD_FIELD,
     inspect_records,
     load_json_records,
@@ -19,7 +20,7 @@ from thai_lexical_v1 import (
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Inspect Thai dictionary JSON schema and coverage.")
-    parser.add_argument("input", help="Path to dictionary JSON.")
+    parser.add_argument("input", nargs="?", default=DEFAULT_INPUT_PATH, help=f"Path to dictionary JSON. Default: {DEFAULT_INPUT_PATH}")
     parser.add_argument("--id-field", default=DEFAULT_ID_FIELD)
     parser.add_argument("--word-field", default=DEFAULT_WORD_FIELD)
     parser.add_argument("--definition-field", default=DEFAULT_DEFINITION_FIELD)
