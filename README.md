@@ -42,52 +42,107 @@ Built-in dense models:
 
 E5 ใช้ `query:` ทั้ง query และ dictionary sense เพราะงานนี้เป็น semantic similarity / paraphrase-style retrieval มากกว่า asymmetric passage QA
 
-## Colab V2 quick start
+## Google Colab — เริ่มใหม่ทั้งหมดจากศูนย์
 
-### 1) checkout V2
+ส่วนนี้เป็นเส้นทางหลักที่แนะนำสำหรับ Colab Free หากต้องการทดสอบ V2 ใหม่ทั้งหมดให้ทำตามลำดับนี้โดยไม่ข้ามขั้น
+
+> แนะนำ: ถ้า Colab Free ให้ GPU ได้ ให้เลือก **Runtime → Change runtime type → T4 GPU** ก่อนเริ่ม Step 1 เพราะการ build dense index บน CPU ทำได้แต่ช้ากว่ามาก
+
+### Step 1 — ล้าง repo เก่าและ clone V2 ใหม่
+
+เริ่มจาก directory `/content` เสมอ เพื่อป้องกันปัญหา clone ซ้อนเป็น `/content/thai_word/thai_word`
 
 ```python
+%cd /content
+!rm -rf /content/thai_word
 !git clone -b feat/dictionary-semantic-v2 https://github.com/SealNM/thai_word.git
-%cd thai_word
-!pip install -r requirements.txt
+%cd /content/thai_word
+
+!git rev-parse --show-toplevel
+!git log -1 --oneline
 ```
 
-ถ้า clone ไว้แล้ว:
+ผลของ `git rev-parse --show-toplevel` ควรเป็น:
+
+```text
+/content/thai_word
+```
+
+### Step 2 — ติดตั้ง dependencies
 
 ```python
-%cd /content/thai_word
-!git fetch origin
-!git checkout feat/dictionary-semantic-v2
-!git reset --hard origin/feat/dictionary-semantic-v2
 !pip install -r requirements.txt
 ```
 
-### 2) build V1 lexical index
+warning เรื่อง Hugging Face `HF_TOKEN` ไม่ใช่ error สำหรับ public models ที่เราใช้ หากไม่ได้ตั้ง token ยังดาวน์โหลดได้ เพียงแต่ rate limit ต่ำกว่า
 
-ถ้ามี `artifacts/v1` จาก V1 ล่าสุดอยู่แล้วใช้ต่อได้เลย หากยังไม่มี:
+### Step 3 — ตรวจ environment และ GPU
+
+```python
+import torch
+
+print("torch:", torch.__version__)
+print("torch CUDA build:", torch.version.cuda)
+print("cuda available:", torch.cuda.is_available())
+
+if torch.cuda.is_available():
+    print("gpu:", torch.cuda.get_device_name(0))
+```
+
+ถ้าใช้ GPU runtime ควรเห็น:
+
+```text
+cuda available: True
+```
+
+หากเลือก GPU ใน Colab แล้วแต่ยังได้ `False` ให้ restart runtime แล้วเริ่ม Step 1 ใหม่ ไม่แนะนำให้สุ่มติดตั้ง PyTorch คนละ build ทับ environment
+
+ถ้า Colab ไม่ให้ GPU สามารถทำต่อด้วย CPU ได้ ระบบจะ fallback จาก `--device cuda` เป็น CPU โดยอัตโนมัติ แต่การ build dense index จะช้ากว่า
+
+### Step 4 — รัน unit tests ก่อน build
+
+```python
+!python -m unittest discover -s tests
+```
+
+ควรให้ tests ผ่านก่อนดำเนินการต่อ หากขั้นนี้แดงให้แก้ก่อน build index เพื่อไม่เสียเวลาสร้าง embeddings ใหม่
+
+### Step 5 — ตรวจพจนานุกรม
+
+```python
+!python scripts/inspect_dictionary.py
+```
+
+ตรวจว่าไฟล์พจนานุกรมอ่านได้และ `definition_coverage` ไม่เป็นศูนย์
+
+### Step 6 — สร้าง V1 lexical index ใหม่
+
+รอบเริ่มใหม่ให้ลบ artifact เดิมทั้งหมดก่อน:
 
 ```python
 !rm -rf artifacts/v1
 !python scripts/build_index.py --output artifacts/v1
 ```
 
-### 3) ตรวจ GPU ก่อน build dense index
+จากนั้นทดลองดู senses และค้น V1:
 
 ```python
-import torch
-print("torch:", torch.__version__)
-print("torch CUDA build:", torch.version.cuda)
-print("cuda available:", torch.cuda.is_available())
-if torch.cuda.is_available():
-    print("gpu:", torch.cuda.get_device_name(0))
+!python scripts/search.py "ฝน" --index artifacts/v1 --list-senses
+!python scripts/search.py "ฝน" --index artifacts/v1 --top-k 10
 ```
 
-ถ้า `cuda available: False`:
-- ใช้ CPU ได้โดยเอา `--device cuda` ออก หรือปล่อยไว้ก็ได้ เพราะ V2 จะ fallback เป็น CPU พร้อม warning
-- ถ้าต้องการ GPU บน Colab ให้เปลี่ยน runtime เป็น GPU แล้วรัน cell ตรวจนี้ใหม่ก่อน build
-- warning เรื่อง `HF_TOKEN` ไม่ใช่ error สำหรับ public models; token มีผลหลักเรื่อง rate limit/download
+ถ้าสองคำสั่งนี้ทำงานจึงค่อยไป dense index
 
-### 4) build E5 dense index
+### Step 7 — ล้าง V2 artifacts เก่า
+
+```python
+!rm -rf artifacts/v2
+!mkdir -p artifacts/v2
+```
+
+### Step 8 — Build E5-small baseline
+
+ถ้า GPU พร้อม:
 
 ```python
 !python scripts/build_dense_index.py \
@@ -98,22 +153,31 @@ if torch.cuda.is_available():
   --batch-size 64
 ```
 
-### 5) build E5-base challenger
+ถ้าใช้ CPU:
 
 ```python
 !python scripts/build_dense_index.py \
   --index artifacts/v1 \
-  --model e5-base \
-  --output artifacts/v2/e5-base \
-  --device cuda \
+  --model e5-small \
+  --output artifacts/v2/e5-small \
+  --device cpu \
   --batch-size 32
 ```
 
-`gte-base-experimental` ยังเก็บไว้สำหรับการทดลองแยก แต่ไม่อยู่ในเส้นทาง benchmark ปกติ เนื่องจากโมเดลพึ่ง custom Hugging Face remote code ซึ่งอาจไม่เข้ากันกับ PyTorch/Transformers รุ่นใหม่บน Colab
+เมื่อสำเร็จควรมี:
 
-ถ้า Colab session ไม่มี GPU จะเอา `--device cuda` ออกก็ได้ หรือคงไว้ได้เช่นกัน เพราะระบบจะตรวจ CUDA และ fallback ไป CPU โดยอัตโนมัติ
+```text
+artifacts/v2/e5-small/dense_embeddings.npy
+artifacts/v2/e5-small/dense_metadata.json
+```
 
-### 6) ทดลอง hybrid search
+ตรวจ metadata:
+
+```python
+!cat artifacts/v2/e5-small/dense_metadata.json
+```
+
+### Step 9 — ทดสอบ hybrid search ด้วย E5-small
 
 ```python
 !python scripts/search_v2.py "พูด" \
@@ -123,7 +187,9 @@ if torch.cuda.is_available():
   --device cuda
 ```
 
-ตัวอย่างเลือก sense:
+ถ้าไม่มี GPU เปลี่ยนเป็น `--device cpu`
+
+ตัวอย่าง query หลายความหมาย:
 
 ```python
 !python scripts/search_v2.py "รัก" \
@@ -134,7 +200,35 @@ if torch.cuda.is_available():
   --device cuda
 ```
 
-### 7) benchmark V1 vs E5-small vs E5-base
+### Step 10 — Build E5-base challenger
+
+E5-base เป็น challenger หลักของ V2 และใช้ 768 dimensions
+
+GPU:
+
+```python
+!python scripts/build_dense_index.py \
+  --index artifacts/v1 \
+  --model e5-base \
+  --output artifacts/v2/e5-base \
+  --device cuda \
+  --batch-size 32
+```
+
+CPU:
+
+```python
+!python scripts/build_dense_index.py \
+  --index artifacts/v1 \
+  --model e5-base \
+  --output artifacts/v2/e5-base \
+  --device cpu \
+  --batch-size 16
+```
+
+### Step 11 — Benchmark V1 vs E5-small vs E5-base
+
+GPU:
 
 ```python
 !python scripts/evaluate_v2.py \
@@ -146,9 +240,52 @@ if torch.cuda.is_available():
   --output evaluation/v2_report.json
 ```
 
-evaluation set pin ความหมายของคำกำกวมไว้แล้ว เช่น `รัก = sense 3`, `สวย = sense 1`, `มืด = sense 1`, `บ้าน = sense 1` เพื่อให้การเทียบ dense model ไม่ถูกบิดจาก homonym ผิดความหมาย
+CPU:
 
-benchmark จะโหลด dense model **ทีละตัว** และเคลียร์ GPU ก่อนโหลดตัวถัดไป เพื่อลด peak memory บน Colab Free
+```python
+!python scripts/evaluate_v2.py \
+  --index artifacts/v1 \
+  --dense-index artifacts/v2/e5-small \
+  --dense-index artifacts/v2/e5-base \
+  --top-k 10 \
+  --device cpu \
+  --output evaluation/v2_report.json
+```
+
+benchmark โหลด dense model ทีละตัวและเคลียร์ GPU ก่อนโหลดตัวถัดไป เพื่อลด peak RAM/VRAM บน Colab Free
+
+evaluation set pin ความหมายของคำกำกวมไว้แล้ว เช่น `รัก = sense 3`, `สวย = sense 1`, `มืด = sense 1`, `บ้าน = sense 1`
+
+### Step 12 — เก็บผล benchmark
+
+ผลฉบับเต็มอยู่ที่:
+
+```text
+evaluation/v2_report.json
+```
+
+metadata ของแต่ละ dense model จะบันทึก:
+- model id
+- dimensions
+- embedding size
+- model load time
+- encode time
+- requested device
+- device ที่ใช้จริง
+
+ใช้ข้อมูลเหล่านี้ร่วมกับคุณภาพผลค้นหาเพื่อตัดสินว่าจะใช้ E5-small หรือ E5-base เป็น default
+
+### Experimental: GTE
+
+`Alibaba-NLP/gte-multilingual-base` ไม่อยู่ใน benchmark หลักอีกแล้ว เพราะพึ่ง Hugging Face custom remote modeling code และพบ compatibility issue กับ PyTorch/Transformers รุ่นปัจจุบันบน Colab
+
+หากต้องการทดลองโดยตั้งใจยังเรียกได้ด้วย:
+
+```text
+--model gte-base-experimental
+```
+
+แต่ไม่ควรใช้เป็นเส้นทางมาตรฐานของ V2 ในตอนนี้
 
 ## V2 artifacts
 
@@ -335,48 +472,6 @@ python scripts/search.py "พรำ" --index artifacts/v1 --top-k 20
 - definition ที่ใช้จับคู่จริง
 - sense_count
 - source_ids
-
-## Google Colab V1 baseline
-
-### Cell 1 — clone branch
-
-```python
-!git clone -b feat/dictionary-semantic-v2 https://github.com/SealNM/thai_word.git
-%cd thai_word
-```
-
-### Cell 2 — dependencies
-
-```python
-!pip install -r requirements.txt
-```
-
-### Cell 3 — inspect
-
-```python
-!python scripts/inspect_dictionary.py
-```
-
-### Cell 4 — build
-
-```python
-!rm -rf artifacts/v1
-!python scripts/build_index.py --output artifacts/v1
-```
-
-### Cell 5 — ดู senses ของคำว่า ฝน
-
-```python
-!python scripts/search.py "ฝน" --index artifacts/v1 --list-senses
-```
-
-### Cell 6 — ค้นด้วยความหมายหลัก
-
-```python
-!python scripts/search.py "ฝน" --index artifacts/v1 --top-k 20
-```
-
-ถ้าต้องการ sense อื่น ให้เติม `--sense 2`, `--sense 3` ตามรายการที่ Cell 5 แสดง
 
 ## ทดสอบ logic ของ sense selection
 
