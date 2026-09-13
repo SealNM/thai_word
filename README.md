@@ -1,6 +1,6 @@
-# Thai Lexical Semantic V2
+# Thai Lexical Semantic V2.5
 
-V2 ต่อจาก V1 โดยเก็บ lexical/sparse baseline เดิมไว้ทั้งหมด แล้วเพิ่ม **sense-level dense embeddings** เพื่อช่วยค้นคำที่ความหมายใกล้กันแม้นิยามใช้คนละถ้อยคำ โดยยังไม่ใช้ LLM หรือ external embedding API และยังออกแบบให้รันบน Google Colab ได้
+V2.5 ต่อจาก V2 โดยเก็บ lexical/sparse baseline และ hybrid fusion เดิมไว้ทั้งหมด แล้วเพิ่ม **EmbeddingGemma 300M** เป็น dense challenger เพื่อวัดว่าพื้นที่ embedding รุ่นเล็กที่ออกแบบมาสำหรับ retrieval โดยตรงให้ผลกับคำไทยสำหรับงานนักเขียนดีกว่า E5 หรือไม่ โดยยังไม่ fine-tune และยังไม่ใช้ LLM teacher
 
 V1 ยังคงเป็น baseline ที่สำคัญสำหรับ direct dictionary relation, sense-aware TF-IDF และ lexical tiers ส่วน V2 เพิ่ม dense retrieval และรวมอันดับด้วย weighted Reciprocal Rank Fusion (RRF)
 
@@ -38,9 +38,13 @@ Built-in dense models:
 | --- | --- | --- |
 | `e5-small` | `intfloat/multilingual-e5-small` | baseline เบา, 384 dimensions, symmetric `query:` prefix |
 | `e5-base` | `intfloat/multilingual-e5-base` | stable challenger, 768 dimensions, standard XLM-R backbone |
+| `embeddinggemma-300m` | `google/embeddinggemma-300m` | V2.5 challenger, native query/document retrieval encoding, 768 dimensions |
+| `embeddinggemma-300m-256` | `google/embeddinggemma-300m` | V2.5 compact challenger, Matryoshka truncation to 256 dimensions |
 | `gte-base-experimental` | `Alibaba-NLP/gte-multilingual-base` | experimental only; uses custom remote code |
 
 E5 ใช้ `query:` ทั้ง query และ dictionary sense เพราะงานนี้เป็น semantic similarity / paraphrase-style retrieval มากกว่า asymmetric passage QA
+
+EmbeddingGemma **ไม่ใช้ prefix แบบ E5 ด้วยมือ** แต่เรียก `SentenceTransformer.encode_query()` และ `encode_document()` โดยตรง เพื่อให้ prompt retrieval ที่มากับ model config ถูกใช้ถูกฝั่ง ส่วน profile 256d ใช้ `truncate_dim=256` ตามความสามารถ Matryoshka ของโมเดล
 
 ## Google Colab — เริ่มใหม่ทั้งหมดจากศูนย์
 
@@ -55,7 +59,7 @@ E5 ใช้ `query:` ทั้ง query และ dictionary sense เพรา
 ```python
 %cd /content
 !rm -rf /content/thai_word
-!git clone -b feat/dictionary-semantic-v2 https://github.com/SealNM/thai_word.git
+!git clone -b feat/dictionary-semantic-v2-5-embeddinggemma https://github.com/SealNM/thai_word.git
 %cd /content/thai_word
 
 !git rev-parse --show-toplevel
@@ -74,7 +78,19 @@ E5 ใช้ `query:` ทั้ง query และ dictionary sense เพรา
 !pip install -r requirements.txt
 ```
 
-warning เรื่อง Hugging Face `HF_TOKEN` ไม่ใช่ error สำหรับ public models ที่เราใช้ หากไม่ได้ตั้ง token ยังดาวน์โหลดได้ เพียงแต่ rate limit ต่ำกว่า
+E5 ยังดาวน์โหลดแบบไม่ล็อกอินได้ แต่ **EmbeddingGemma เป็น gated model**: ก่อน build V2.5 ต้องล็อกอิน Hugging Face, เปิดหน้าโมเดล `google/embeddinggemma-300m`, ยอมรับ Google usage license และตั้ง `HF_TOKEN` ที่มีสิทธิ์อ่านโมเดล
+
+บน Colab แนะนำเก็บ token ใน **Secrets** ชื่อ `HF_TOKEN` แล้วรัน:
+
+```python
+from google.colab import userdata
+import os
+
+os.environ["HF_TOKEN"] = userdata.get("HF_TOKEN")
+print("HF_TOKEN ready:", bool(os.environ.get("HF_TOKEN")))
+```
+
+อย่า commit token ลง repo หรือใส่ token ตรง ๆ ใน notebook ที่จะแชร์
 
 ### Step 3 — ตรวจ environment และ GPU
 
@@ -285,6 +301,85 @@ metadata ของแต่ละ dense model จะบันทึก:
 - device ที่ใช้จริง
 
 ใช้ข้อมูลเหล่านี้ร่วมกับคุณภาพผลค้นหาเพื่อตัดสินว่าจะใช้ E5-small หรือ E5-base เป็น default
+
+### Step 13 — Build EmbeddingGemma 300M (768d)
+
+> ต้องทำขั้นยอมรับ license + ตั้ง `HF_TOKEN` จาก Step 2 ก่อน
+
+GPU:
+
+```python
+%cd /content/thai_word
+!python scripts/build_dense_index.py \
+  --index artifacts/v1 \
+  --model embeddinggemma-300m \
+  --output artifacts/v2/embeddinggemma-300m \
+  --device cuda \
+  --batch-size 32
+```
+
+เมื่อสำเร็จ metadata ควรมี:
+
+```json
+{
+  "model_key": "embeddinggemma-300m",
+  "model_id": "google/embeddinggemma-300m",
+  "query_method": "encode_query",
+  "document_method": "encode_document",
+  "dimensions": 768
+}
+```
+
+EmbeddingGemma ไม่รองรับ activation แบบ float16 จึงไม่ควรเพิ่ม `.half()` หรือบังคับ `torch_dtype=float16` เอง ใช้ค่า default float32 หรือ bfloat16 ที่ runtime รองรับ
+
+### Step 14 — Build EmbeddingGemma compact (256d)
+
+ใช้ model เดิมแต่ตัด embedding ลงเหลือ 256 dimensions เพื่อวัด trade-off ระหว่างคุณภาพกับขนาด index:
+
+```python
+%cd /content/thai_word
+!python scripts/build_dense_index.py \
+  --index artifacts/v1 \
+  --model embeddinggemma-300m-256 \
+  --output artifacts/v2/embeddinggemma-300m-256 \
+  --device cuda \
+  --batch-size 32
+```
+
+### Step 15 — Benchmark V2.5 เทียบกับ E5 บน query set เดิม
+
+ใช้ evaluation set เดิมโดยตั้งใจ เพื่อให้ผลเทียบ V2 กับ V2.5 แบบ apples-to-apples:
+
+```python
+%cd /content/thai_word
+!python scripts/evaluate_v2.py \
+  --index artifacts/v1 \
+  --dense-index artifacts/v2/e5-small \
+  --dense-index artifacts/v2/e5-base \
+  --dense-index artifacts/v2/embeddinggemma-300m \
+  --dense-index artifacts/v2/embeddinggemma-300m-256 \
+  --top-k 10 \
+  --device cuda \
+  --output evaluation/v2_5_report.json
+```
+
+console output จะแสดง `model_key/dimensions` เช่น:
+
+```text
+V2 embeddinggemma-300m/768d: ...
+V2 embeddinggemma-300m-256/256d: ...
+```
+
+### Step 16 — เกณฑ์ตัดสิน V2.5
+
+ยังไม่เลือกโมเดลจาก cosine score ดิบ ให้ดูร่วมกัน 4 อย่าง:
+
+1. คุณภาพ top-10 ของคำทดสอบเดิม โดยเฉพาะคำที่ V2 เคยพลาด
+2. ความสามารถดัน synonym/คำแทนขึ้นโดยไม่ดันคำที่ “เกี่ยวข้องแต่แทนกันไม่ได้” สูงเกินไป
+3. เวลา build/query และ RAM/VRAM บน Colab Free
+4. ขนาด `dense_embeddings.npy` ของ 768d เทียบ 256d
+
+ถ้า EmbeddingGemma ชนะ E5 อย่างสม่ำเสมอจึงค่อยใช้เป็นฐาน V3 training; ถ้าชนะเฉพาะบางกลุ่มคำ ให้เก็บเป็น challenger และยังไม่รีบ fine-tune
 
 ### Experimental: GTE
 
