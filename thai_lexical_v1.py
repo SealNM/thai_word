@@ -545,7 +545,7 @@ def search(
                     else 0.0
                 )
                 reverse_strength = (
-                    _reference_strength(candidate_sense["definition"], query)
+                    _reference_strength(artifacts.senses[candidate_sense_id]["definition"], query)
                     if reverse_ref
                     else 0.0
                 )
