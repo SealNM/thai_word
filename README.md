@@ -57,11 +57,19 @@ V1 เก็บ headword เดียวเป็น entry เดียวเพ
 6. สร้าง word + bigram TF-IDF จาก definition ของแต่ละ sense
 7. สร้าง direct lexical references เมื่อ definition กล่าวถึง headword อื่น
 8. candidate generation ใช้ทั้ง definition similarity และ direct references
-9. จัดอันดับจาก:
-   - definition cosine similarity 55%
-   - direct definition reference 25%
-   - shared definition tokens 15%
+9. แยกคุณภาพ lexical reference แทนการให้คะแนนทุก mention เท่ากัน:
+   - นิยามตรง เช่น `ฝน.` = คำพ้อง/คำแทนโดยตรง
+   - นิยามชนิดย่อย เช่น `ฝนเม็ดใหญ่...` = type-of relation
+   - mention ในตัวอย่าง เช่น `เช่น เมฆอุ้มฝน` = contextual relation
+   - mention เชิงเกี่ยวข้อง เช่น `เทวดาแห่งฝน` = associated relation
+10. จัดอันดับ baseline จาก:
+   - definition cosine similarity 35%
+   - reverse definitional reference strength 40%
+   - forward definition-component reference strength 3%
+   - shared definition tokens 17%
    - word-form similarity 5%
+
+จุดสำคัญคือ reverse reference (candidate นิยามตัวเองด้วย query) มีน้ำหนักสูงกว่า forward reference (นิยาม query กล่าวถึง candidate) มาก เพื่อไม่ให้คำอย่าง `เมฆ` หรือ `เม็ด` ถูกมองเท่าคำพ้องของ `ฝน`
 
 น้ำหนักทั้งหมดเป็น baseline และตั้งใจให้ปรับจาก evaluation set ภายหลัง
 
@@ -147,7 +155,8 @@ python scripts/search.py "พรำ" --index artifacts/v1 --top-k 20
 - score
 - relation hint
 - definition cosine
-- direct reference
+- reverse reference strength
+- forward reference strength
 - shared tokens
 - word-form score
 - `query_sense`
