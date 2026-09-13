@@ -434,6 +434,61 @@ def _reference_strength(definition: str, target_word: str) -> float:
     return 0.30
 
 
+def _is_bound_form(word: str) -> bool:
+    word = normalize_text(word)
+    return word.startswith("-") or word.endswith("-")
+
+
+def _relation_tier(
+    *,
+    reverse_strength: float,
+    forward_strength: float,
+    candidate_word: str,
+) -> int:
+    """Return a lexical relation tier where higher is more useful for thesaurus search."""
+    if reverse_strength >= 0.999:
+        tier = 5  # exact gloss / synonym: "ฝน."
+    elif reverse_strength >= 0.90:
+        tier = 4  # alternative gloss: "เมฆ, ฝน."
+    elif reverse_strength >= 0.60:
+        tier = 3  # subtype / kind-of: "ฝนเม็ดใหญ่..."
+    elif reverse_strength > 0:
+        tier = 2  # contextual or associated mention
+    elif forward_strength > 0:
+        tier = 1  # query definition mentions candidate
+    else:
+        tier = 0  # distributional definition similarity only
+
+    # Dictionary combining forms such as "พรรษ-" are useful metadata but are
+    # less directly usable by writers as standalone lexical choices.
+    if _is_bound_form(candidate_word) and tier > 0:
+        tier -= 1
+    return tier
+
+
+def _hierarchical_score(
+    relation_tier: int,
+    *,
+    cosine: float,
+    shared: float,
+    word_form: float,
+    exact_headword_query: bool,
+) -> float:
+    semantic_tiebreak = (
+        0.55 * max(0.0, min(1.0, cosine))
+        + 0.25 * max(0.0, min(1.0, shared))
+        + 0.20 * max(0.0, min(1.0, word_form))
+    )
+
+    if not exact_headword_query:
+        return semantic_tiebreak
+
+    # Tier gaps (0.17) are deliberately wider than the maximum tiebreak
+    # contribution (0.15), so a lower relation class can never overtake a
+    # stronger lexical relation merely because its definitions share tokens.
+    return 0.17 * relation_tier + 0.15 * semantic_tiebreak
+
+
 def _top_indices(scores: np.ndarray, count: int) -> np.ndarray:
     if count <= 0:
         return np.array([], dtype=np.int64)
@@ -550,23 +605,25 @@ def search(
                     else 0.0
                 )
                 shared = _jaccard(query_tokens, candidate_tokens)
-
-                # Reverse references answer "what is this word defined as?" and are
-                # the strongest lexical signal. Forward references mostly describe
-                # components of the query definition (e.g. ฝน -> เมฆ/เม็ด), so they
-                # deliberately receive much less weight.
-                score = (
-                    0.35 * cosine
-                    + 0.40 * reverse_strength
-                    + 0.03 * forward_strength
-                    + 0.17 * shared
-                    + 0.05 * word_form
+                relation_tier = _relation_tier(
+                    reverse_strength=reverse_strength,
+                    forward_strength=forward_strength,
+                    candidate_word=candidate["word"],
+                )
+                score = _hierarchical_score(
+                    relation_tier,
+                    cosine=cosine,
+                    shared=shared,
+                    word_form=word_form,
+                    exact_headword_query=query_entry_index is not None,
                 )
 
                 if forward_ref and reverse_ref:
                     relation_hint = "mutual_definition_reference"
-                elif reverse_ref and reverse_strength >= 0.90:
+                elif reverse_ref and reverse_strength >= 0.999:
                     relation_hint = "direct_gloss_or_synonym"
+                elif reverse_ref and reverse_strength >= 0.90:
+                    relation_hint = "alternative_direct_gloss"
                 elif reverse_ref and reverse_strength >= 0.60:
                     relation_hint = "defined_as_kind_of_query"
                 elif reverse_ref:
@@ -578,9 +635,13 @@ def search(
                 else:
                     relation_hint = "definition_similar"
 
+                if _is_bound_form(candidate["word"]):
+                    relation_hint = f"bound_form:{relation_hint}"
+
                 if best is None or score > best["score_raw"]:
                     best = {
                         "score_raw": float(score),
+                        "relation_tier": relation_tier,
                         "cosine": cosine,
                         "forward_reference": forward_strength,
                         "reverse_reference": reverse_strength,
@@ -605,6 +666,8 @@ def search(
                 "word": candidate["word"],
                 "score": round(best["score_raw"], 6),
                 "relation_hint": best["relation_hint"],
+                "relation_tier": best["relation_tier"],
+                "lexical_form": "bound_form" if _is_bound_form(candidate["word"]) else "standalone",
                 "signals": {
                     "definition_cosine": round(best["cosine"], 6),
                     "reverse_reference": round(best["reverse_reference"], 6),
@@ -630,5 +693,10 @@ def search(
             }
         )
 
-    results.sort(key=lambda item: item["score"], reverse=True)
+    results.sort(
+        key=lambda item: (
+            -item["score"],
+            item["word"],
+        )
+    )
     return results[:top_k]
