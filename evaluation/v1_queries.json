@@ -3,7 +3,7 @@
   "queries": [
     {"query": "ฝน", "sense": 1, "category": "noun:nature"},
     {"query": "โกรธ", "sense": null, "category": "emotion"},
-    {"query": "เดิน", "sense": null, "category": "verb:motion"},
+    {"query": "เดิน", "sense": 1, "category": "verb:motion"},
     {"query": "สวย", "sense": null, "category": "adjective:appearance"},
     {"query": "มืด", "sense": null, "category": "adjective:light"},
     {"query": "รัก", "sense": null, "category": "emotion/verb"},
