@@ -4,7 +4,7 @@ Baseline สำหรับค้นหาคำภาษาไทยที่�
 
 ## Schema จริงที่ V1 ใช้เป็นค่าเริ่มต้น
 
-จากตัวอย่างข้อมูลพจนานุกรมจริง:
+จากข้อมูลพจนานุกรมจริง:
 
 ```json
 [
@@ -29,25 +29,23 @@ Baseline สำหรับค้นหาคำภาษาไทยที่�
 
 ถ้า dataset รุ่นอื่นใช้ชื่อฟิลด์ต่างออกไป ยัง override ได้ด้วย `--id-field`, `--word-field` และ `--definition-field`
 
-## คำเดียวหลายความหมาย
+## คำเดียวหลายความหมาย: sense-aware retrieval
 
-พจนานุกรมจริงมีหลาย records ที่ใช้ `headword_text` เดียวกันแต่คนละ `word_ID` / คนละความหมาย เช่น `พรำ`
+พจนานุกรมจริงมีหลาย records ที่ใช้ `headword_text` เดียวกันแต่คนละ `word_ID` / คนละความหมาย
 
-V1 จะ:
+V1 เก็บ headword เดียวเป็น entry เดียวเพื่อไม่ให้ผลลัพธ์ซ้ำ แต่ **ไม่เอาความหมายทั้งหมดมาต่อรวมเป็น vector เดียวอีกแล้ว** เพราะคำหลายความหมาย เช่น `ฝน` อาจหมายถึงทั้งฝนจากฟ้า, รอบปี หรือกริยาฝน/ลับ
 
-1. รวม records ที่มี headword เดียวกันเป็น semantic entry เดียว
-2. เก็บทุกความหมายที่ไม่ซ้ำ
-3. เก็บ `source_ids` ของทุก record
-4. เก็บ `sense_count`
-5. ใช้ความหมายทั้งหมดร่วมกันในการสร้าง representation
+ระบบจะ:
 
-จึงไม่ทิ้ง sense อื่นของคำเดียวกัน
+1. รวม metadata ของ headword เดียวกันไว้ด้วยกัน
+2. เก็บทุก definition เป็น sense แยกกันตามลำดับเดิมของพจนานุกรม
+3. สร้าง TF-IDF vector แยกต่อ sense
+4. ค้นหาและให้คะแนนจากคู่ sense ที่ตรงกันที่สุด
+5. ค่าเริ่มต้นของ exact-headword query ใช้ **sense 1**
+6. เลือก sense อื่นได้ด้วย `--sense N`
+7. แสดงทั้ง `query_sense` และ `matched_candidate_sense` ในผลลัพธ์
 
-## สถานะ `thai_word.json` เดิมใน repo
-
-ไฟล์ `thai_word.json` บน `main` มี 39,193 records / 39,193 headwords ไม่ซ้ำ แต่มีเพียง `headword_ID` และ `headword_text` จึงยังใช้สร้าง semantic index ไม่ได้
-
-สำหรับ V1 จริง สาขานี้มี `thai_dictionary.json` ที่มี `definition_text` อยู่แล้ว และ pipeline จะเลือกไฟล์นี้โดยอัตโนมัติเมื่อไม่ส่ง path
+วิธีนี้ลดการปนกันของความหมายโดยไม่ต้องใช้โมเดลภายนอก
 
 ## V1 ทำอะไร
 
@@ -55,10 +53,11 @@ V1 จะ:
 2. ตัดคำไทยด้วย PyThaiNLP `newmm`
 3. ใช้ headwords ทั้งชุดเป็น custom dictionary เพื่อรักษาคำเฉพาะ/คำประสม
 4. ตัด Thai stopwords
-5. รวม multiple senses ของ headword เดียวกัน
-6. สร้าง word + bigram TF-IDF จากความหมาย
-7. สร้าง direct lexical references เมื่อความหมายกล่าวถึง headword อื่น
-8. จัดอันดับจาก:
+5. เก็บ multiple senses ของ headword เดียวกันแบบแยก representation
+6. สร้าง word + bigram TF-IDF จาก definition ของแต่ละ sense
+7. สร้าง direct lexical references เมื่อ definition กล่าวถึง headword อื่น
+8. candidate generation ใช้ทั้ง definition similarity และ direct references
+9. จัดอันดับจาก:
    - definition cosine similarity 55%
    - direct definition reference 25%
    - shared definition tokens 15%
@@ -76,44 +75,22 @@ pip install -r requirements.txt
 
 ## 1) ตรวจไฟล์พจนานุกรม
 
-สาขานี้มีไฟล์จริง `thai_dictionary.json` อยู่แล้ว และถูกตั้งเป็นค่าเริ่มต้นของ pipeline ดังนั้นรันได้ทันที:
-
 ```bash
 python scripts/inspect_dictionary.py
 ```
 
-ถ้าต้องการใช้ไฟล์อื่น ยังส่ง path เองได้:
+ถ้าต้องการใช้ไฟล์อื่น:
 
 ```bash
 python scripts/inspect_dictionary.py another.json
 ```
 
-ตัว inspector จะรายงาน:
-
-- จำนวน records
-- จำนวน ID
-- จำนวน headwords
-- จำนวนคำไม่ซ้ำ
-- จำนวน duplicate headword rows
-- definition coverage
-- schema fields ที่พบ
-
-ถ้า definition coverage เป็น 0 ระบบจะหยุดก่อน build เพื่อไม่สร้าง semantic index จากชื่อคำเพียงอย่างเดียว
-
-### Dataset ที่ใช้ชื่อฟิลด์อื่น
-
-```bash
-python scripts/inspect_dictionary.py another.json \
-  --id-field id \
-  --word-field word \
-  --definition-field meaning
-```
-
 ## 2) สร้าง index
 
-สำหรับ schema จริง `word_ID / headword_text / definition_text` ไม่ต้องระบุ field เพิ่ม:
+ถ้าเคย build artifact schema รุ่นก่อนหน้า ให้ลบแล้วสร้างใหม่:
 
 ```bash
+rm -rf artifacts/v1
 python scripts/build_index.py --output artifacts/v1
 ```
 
@@ -122,23 +99,44 @@ Artifacts:
 ```text
 artifacts/v1/
 ├── entries.json
+├── senses.json
 ├── metadata.json
+├── entry_to_senses.joblib
 ├── references.joblib
+├── reverse_references.joblib
 ├── tfidf_matrix.npz
 ├── token_sets.joblib
 ├── vectorizer.joblib
 └── word_to_index.json
 ```
 
-`metadata.json` จะมีทั้ง `entries_indexed` และ `senses_indexed` เพื่อแยกจำนวน headwords หลัง merge ออกจากจำนวนความหมายที่ใช้จริง
+`metadata.json` จะมี `entries_indexed`, `senses_indexed` และ `representation: "sense_level"`
 
-## 3) ทดลองค้นหา
+## 3) ตรวจว่าคำหนึ่งมีความหมายอะไรบ้าง
+
+ตัวอย่างคำว่า `ฝน`:
+
+```bash
+python scripts/search.py "ฝน" --index artifacts/v1 --list-senses
+```
+
+ผลจะคืนลำดับ sense และ definition ตามพจนานุกรม
+
+## 4) ทดลองค้นหา
+
+ค่าเริ่มต้น exact headword จะใช้ sense 1:
 
 ```bash
 python scripts/search.py "ฝน" --index artifacts/v1 --top-k 20
 ```
 
-หรือ:
+เลือกความหมายอื่นได้ เช่น sense 2:
+
+```bash
+python scripts/search.py "ฝน" --index artifacts/v1 --sense 2 --top-k 20
+```
+
+หรือค้นคำอื่น:
 
 ```bash
 python scripts/search.py "พรำ" --index artifacts/v1 --top-k 20
@@ -152,15 +150,13 @@ python scripts/search.py "พรำ" --index artifacts/v1 --top-k 20
 - direct reference
 - shared tokens
 - word-form score
-- definition ที่รวมแล้ว
+- `query_sense`
+- `matched_candidate_sense`
+- definition ที่ใช้จับคู่จริง
 - sense_count
 - source_ids
 
-จึงตรวจสอบได้ว่าคำนั้นขึ้นมาเพราะอะไร
-
 ## Google Colab
-
-V1 เหมาะกับ Colab Free เพราะใช้ CPU และ sparse matrix
 
 ### Cell 1 — clone branch
 
@@ -177,8 +173,6 @@ V1 เหมาะกับ Colab Free เพราะใช้ CPU และ sp
 
 ### Cell 3 — inspect
 
-ไฟล์ `thai_dictionary.json` อยู่ใน branch แล้ว ไม่ต้อง upload เพิ่ม:
-
 ```python
 !python scripts/inspect_dictionary.py
 ```
@@ -186,14 +180,31 @@ V1 เหมาะกับ Colab Free เพราะใช้ CPU และ sp
 ### Cell 4 — build
 
 ```python
+!rm -rf artifacts/v1
 !python scripts/build_index.py --output artifacts/v1
 ```
 
-### Cell 5 — search
+### Cell 5 — ดู senses ของคำว่า ฝน
 
 ```python
-!python scripts/search.py "พรำ" --index artifacts/v1 --top-k 20
+!python scripts/search.py "ฝน" --index artifacts/v1 --list-senses
 ```
+
+### Cell 6 — ค้นด้วยความหมายหลัก
+
+```python
+!python scripts/search.py "ฝน" --index artifacts/v1 --top-k 20
+```
+
+ถ้าต้องการ sense อื่น ให้เติม `--sense 2`, `--sense 3` ตามรายการที่ Cell 5 แสดง
+
+## ทดสอบ logic ของ sense selection
+
+```bash
+python -m unittest discover -s tests
+```
+
+test นี้ไม่ต้องโหลดพจนานุกรมเต็ม และตรวจว่า default search ใช้ sense 1 ขณะที่ `--sense 2` เปลี่ยน semantic neighborhood ได้จริง
 
 ## ทรัพยากรเป้าหมาย
 
@@ -202,6 +213,6 @@ V1 เหมาะกับ Colab Free เพราะใช้ CPU และ sp
 - CPU: 2–4 vCPU ก็เริ่มได้
 - RAM: 4–8 GB เป้าหมายเริ่มต้น
 - GPU: ไม่ใช้
-- index: sparse TF-IDF
+- index: sparse TF-IDF ระดับ sense
 
-ตัวเลขจริงจะวัดจากไฟล์เต็มหลัง build ครั้งแรก
+ตัวเลขจริงจะวัดจากไฟล์เต็มหลัง build
