@@ -129,6 +129,8 @@ E5 ใช้ `query:` ทั้ง query และ dictionary sense เพรา
 
 evaluation set pin ความหมายของคำกำกวมไว้แล้ว เช่น `รัก = sense 3`, `สวย = sense 1`, `มืด = sense 1`, `บ้าน = sense 1` เพื่อให้การเทียบ dense model ไม่ถูกบิดจาก homonym ผิดความหมาย
 
+benchmark จะโหลด dense model **ทีละตัว** และเคลียร์ GPU ก่อนโหลดตัวถัดไป เพื่อลด peak memory บน Colab Free
+
 ## V2 artifacts
 
 แต่ละ dense model เก็บแยก directory:
@@ -227,7 +229,7 @@ V1 เก็บ headword เดียวเป็น entry เดียวเพ
 pip install -r requirements.txt
 ```
 
-ใช้ CPU เท่านั้น ไม่ต้องมี GPU
+V1 ใช้ CPU ได้ทั้งหมด ส่วน V2 dense embedding ใช้ CPU ได้เช่นกันแต่แนะนำ GPU เมื่อ build index
 
 ## 1) ตรวจไฟล์พจนานุกรม
 
@@ -417,13 +419,15 @@ python scripts/evaluate.py \
 
 ## ทรัพยากรเป้าหมาย
 
-สำหรับประมาณ 50,000 records:
+สำหรับพจนานุกรมระดับหลายหมื่น records:
 
-- CPU: 2–4 vCPU ก็เริ่มได้
-- RAM: 4–8 GB เป้าหมายเริ่มต้น
-- V1 lexical: CPU-only
+- V1 lexical: CPU-only, 2–4 vCPU ใช้งานได้
+- V1 RAM: 4–8 GB เป็นเป้าหมายเริ่มต้น
 - V2 dense build: GPU แนะนำแต่ไม่บังคับ
-- RAM: 4–8 GB ยังเป็นเป้าหมายเริ่มต้นสำหรับ V1; V2 ขึ้นกับโมเดลที่เลือก
-- index: sparse TF-IDF + dense sense embeddings
+- E5-small เบากว่าและเป็น baseline แรกสำหรับ Colab
+- GTE-base หนักกว่า จึงใช้ batch size เริ่มต้นต่ำกว่า
+- dense index ใช้ normalized float32 และยังไม่ต้องใช้ FAISS ใน V2 baseline
+- benchmark หลายโมเดลโหลดทีละโมเดลเพื่อลด peak RAM/VRAM
+- index รวม: sparse TF-IDF + lexical graph + dense sense embeddings
 
-ตัวเลขจริงจะวัดจากไฟล์เต็มหลัง build
+ตัวเลข build time / RAM / VRAM จริงจะเก็บจาก Colab หลัง benchmark เต็มชุด
