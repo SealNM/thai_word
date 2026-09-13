@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+import warnings
 from time import perf_counter
 from dataclasses import dataclass
 from pathlib import Path
@@ -71,6 +72,57 @@ def _prepare_texts(
     return [f"{prefix}{text}" for text in texts]
 
 
+def resolve_device(device: str | None) -> str | None:
+    """Resolve an explicitly requested accelerator with a safe CPU fallback."""
+    if not device:
+        return None
+
+    requested = str(device).strip()
+    if not requested.lower().startswith("cuda"):
+        return requested
+
+    try:
+        import torch
+    except ImportError:
+        warnings.warn(
+            f"Requested device {requested!r}, but PyTorch is unavailable; falling back to CPU.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        return "cpu"
+
+    if not torch.cuda.is_available():
+        build_cuda = getattr(torch.version, "cuda", None)
+        reason = (
+            "this PyTorch build has no CUDA support"
+            if build_cuda is None
+            else "CUDA is not available in this runtime"
+        )
+        warnings.warn(
+            f"Requested device {requested!r}, but {reason}; falling back to CPU. "
+            "On Colab, enable a GPU runtime if you want CUDA acceleration.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
+        return "cpu"
+
+    if ":" in requested:
+        try:
+            index = int(requested.split(":", 1)[1])
+        except ValueError:
+            index = -1
+        if index < 0 or index >= torch.cuda.device_count():
+            warnings.warn(
+                f"Requested device {requested!r}, but only {torch.cuda.device_count()} "
+                "CUDA device(s) are available; falling back to cuda:0.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+            return "cuda:0"
+
+    return requested
+
+
 def load_model(profile: dict[str, Any], device: str | None = None):
     try:
         from sentence_transformers import SentenceTransformer
@@ -83,8 +135,9 @@ def load_model(profile: dict[str, Any], device: str | None = None):
     kwargs: dict[str, Any] = {
         "trust_remote_code": bool(profile.get("trust_remote_code", False)),
     }
-    if device:
-        kwargs["device"] = device
+    effective_device = resolve_device(device)
+    if effective_device:
+        kwargs["device"] = effective_device
     return SentenceTransformer(profile["model_id"], **kwargs)
 
 
@@ -137,7 +190,8 @@ def build_dense_index(
         "embedding_megabytes": round(float(embeddings.nbytes / (1024 ** 2)), 3),
         "model_load_seconds": round(float(load_seconds), 3),
         "encode_seconds": round(float(encode_seconds), 3),
-        "device": str(getattr(encoder, "device", device or "auto")),
+        "requested_device": device or "auto",
+        "device": str(getattr(encoder, "device", "auto")),
         "text_template": "{headword}: {definition}",
     }
     with (out / "dense_metadata.json").open("w", encoding="utf-8") as handle:
