@@ -47,7 +47,7 @@ V1 จะ:
 
 ไฟล์ `thai_word.json` บน `main` มี 39,193 records / 39,193 headwords ไม่ซ้ำ แต่มีเพียง `headword_ID` และ `headword_text` จึงยังใช้สร้าง semantic index ไม่ได้
 
-สำหรับการทดลอง V1 สาขานี้มี `thai_dictionary_test.json` ที่มี `definition_text` อยู่แล้ว และ pipeline จะเลือกไฟล์นี้โดยอัตโนมัติเมื่อไม่ส่ง path
+สำหรับ V1 จริง สาขานี้มี `thai_dictionary.json` ที่มี `definition_text` อยู่แล้ว และ pipeline จะเลือกไฟล์นี้โดยอัตโนมัติเมื่อไม่ส่ง path
 
 ## V1 ทำอะไร
 
@@ -76,7 +76,7 @@ pip install -r requirements.txt
 
 ## 1) ตรวจไฟล์พจนานุกรม
 
-สาขานี้มีไฟล์ `thai_dictionary_test.json` อยู่แล้ว และถูกตั้งเป็นค่าเริ่มต้นของ pipeline ดังนั้นรันได้ทันที:
+สาขานี้มีไฟล์จริง `thai_dictionary.json` อยู่แล้ว และถูกตั้งเป็นค่าเริ่มต้นของ pipeline ดังนั้นรันได้ทันที:
 
 ```bash
 python scripts/inspect_dictionary.py
@@ -177,7 +177,7 @@ V1 เหมาะกับ Colab Free เพราะใช้ CPU และ sp
 
 ### Cell 3 — inspect
 
-ไฟล์ `thai_dictionary_test.json` อยู่ใน branch แล้ว ไม่ต้อง upload เพิ่ม:
+ไฟล์ `thai_dictionary.json` อยู่ใน branch แล้ว ไม่ต้อง upload เพิ่ม:
 
 ```python
 !python scripts/inspect_dictionary.py
