@@ -434,6 +434,70 @@ def _reference_strength(definition: str, target_word: str) -> float:
     return 0.30
 
 
+def _forward_reference_strength(definition: str, target_word: str) -> float:
+    """Estimate how strongly the query definition presents target_word as a gloss.
+
+    Unlike reverse references, a word mentioned inside the query definition may
+    be a true gloss ("ไว เช่น ..."), an alias ("พูดจา ก็ว่า"), an example
+    ("กินเร็ว"), or even part of a negated contrast ("ไม่ชักช้า"). These cases
+    should not receive the same lexical weight.
+    """
+    definition = normalize_text(definition)
+    target_word = normalize_text(target_word)
+    if not definition or not target_word or target_word not in definition:
+        return 0.0
+
+    clauses = [
+        part.strip(" \t\r\n.,;:!?()[]{}“”‘’\"'")
+        for part in re.split(r"[,;]", definition)
+    ]
+    best = 0.0
+
+    for clause in clauses:
+        if target_word not in clause:
+            continue
+
+        start = 0
+        while True:
+            target_pos = clause.find(target_word, start)
+            if target_pos < 0:
+                break
+
+            before = clause[:target_pos].strip()
+            after = clause[target_pos + len(target_word):].strip()
+
+            negation_markers = ("ไม่", "มิ", "มิได้", "หาไม่", "ปราศจาก", "ไร้")
+            if any(before.endswith(marker) for marker in negation_markers):
+                strength = 0.0
+            else:
+                example_markers = ("เช่น", "ตัวอย่าง", "ในคำว่า", "อาทิ")
+                after_example = any(marker in before for marker in example_markers)
+
+                if after_example:
+                    strength = 0.10
+                elif not before:
+                    alias_markers = ("ก็ว่า", "เรียกว่า", "ใช้ว่า", "หรือว่า")
+                    if not after:
+                        strength = 1.0
+                    elif any(marker in after for marker in alias_markers):
+                        strength = 1.0
+                    elif after.startswith("เช่น"):
+                        strength = 0.95
+                    else:
+                        # A leading word in a descriptive clause is often the
+                        # primary gloss, but is weaker than an explicit alias.
+                        strength = 0.70
+                else:
+                    # Mid-clause mentions normally describe components rather
+                    # than interchangeable words.
+                    strength = 0.25
+
+            best = max(best, strength)
+            start = target_pos + len(target_word)
+
+    return best
+
+
 def _is_bound_form(word: str) -> bool:
     word = normalize_text(word)
     return word.startswith("-") or word.endswith("-")
@@ -454,10 +518,14 @@ def _relation_tier(
         tier = 3  # subtype / kind-of: "ฝนเม็ดใหญ่..."
     elif reverse_strength > 0:
         tier = 2  # contextual or associated mention
-    elif forward_strength > 0:
-        tier = 1  # query definition mentions candidate
+    elif forward_strength >= 0.90:
+        tier = 4  # query gloss / alias: "ไว เช่น ..." or "พูดจา ก็ว่า"
+    elif forward_strength >= 0.60:
+        tier = 3  # leading descriptive gloss
+    elif forward_strength >= 0.20:
+        tier = 1  # definition component
     else:
-        tier = 0  # distributional definition similarity only
+        tier = 0  # example mention or distributional similarity only
 
     # Dictionary combining forms such as "พรรษ-" are useful metadata but are
     # less directly usable by writers as standalone lexical choices.
@@ -595,7 +663,7 @@ def search(
                     else 0.0
                 )
                 forward_strength = (
-                    _reference_strength(query_definition, candidate["word"])
+                    _forward_reference_strength(query_definition, candidate["word"])
                     if forward_ref
                     else 0.0
                 )
@@ -628,8 +696,14 @@ def search(
                     relation_hint = "defined_as_kind_of_query"
                 elif reverse_ref:
                     relation_hint = "candidate_mentions_query"
+                elif forward_strength >= 0.90:
+                    relation_hint = "query_gloss_or_alias"
+                elif forward_strength >= 0.60:
+                    relation_hint = "query_leading_gloss"
+                elif forward_strength >= 0.20:
+                    relation_hint = "query_definition_component"
                 elif forward_ref:
-                    relation_hint = "query_definition_mentions_candidate"
+                    relation_hint = "query_example_mentions_candidate"
                 elif query in candidate["word"] or candidate["word"] in query:
                     relation_hint = "compound_or_form_related"
                 else:
@@ -649,6 +723,13 @@ def search(
                         "relation_hint": relation_hint,
                         "candidate_sense_id": candidate_sense_id,
                         "query_sense_id": query_sense_id,
+                        "sense_reference_ambiguous": bool(
+                            query_entry_index is not None
+                            and len(available_query_senses) > 1
+                            and reverse_strength >= 0.90
+                            and cosine == 0.0
+                            and shared == 0.0
+                        ),
                     }
 
         if best is None:
@@ -668,6 +749,11 @@ def search(
                 "relation_hint": best["relation_hint"],
                 "relation_tier": best["relation_tier"],
                 "lexical_form": "bound_form" if _is_bound_form(candidate["word"]) else "standalone",
+                "sense_resolution": (
+                    "headword_reference_ambiguous"
+                    if best["sense_reference_ambiguous"]
+                    else "selected_sense_supported"
+                ),
                 "signals": {
                     "definition_cosine": round(best["cosine"], 6),
                     "reverse_reference": round(best["reverse_reference"], 6),
