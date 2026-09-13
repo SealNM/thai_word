@@ -1,0 +1,15 @@
+{
+  "description": "Cross-domain manual evaluation set for Thai Lexical Semantic V1. Keep this small and diverse to detect ranking regressions before tuning weights.",
+  "queries": [
+    {"query": "ฝน", "sense": 1, "category": "noun:nature"},
+    {"query": "โกรธ", "sense": null, "category": "emotion"},
+    {"query": "เดิน", "sense": null, "category": "verb:motion"},
+    {"query": "สวย", "sense": null, "category": "adjective:appearance"},
+    {"query": "มืด", "sense": null, "category": "adjective:light"},
+    {"query": "รัก", "sense": null, "category": "emotion/verb"},
+    {"query": "พูด", "sense": null, "category": "verb:speech"},
+    {"query": "เร็ว", "sense": null, "category": "adjective:speed"},
+    {"query": "กลัว", "sense": null, "category": "emotion"},
+    {"query": "บ้าน", "sense": null, "category": "noun:place"}
+  ]
+}
