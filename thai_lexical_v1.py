@@ -509,23 +509,33 @@ def _relation_tier(
     forward_strength: float,
     candidate_word: str,
 ) -> int:
-    """Return a lexical relation tier where higher is more useful for thesaurus search."""
+    """Return the strongest supported lexical relation tier.
+
+    Reverse and forward evidence describe different directions and can coexist.
+    Compute them independently so a weak contextual reverse mention does not
+    suppress a stronger forward gloss from the selected query sense.
+    """
     if reverse_strength >= 0.999:
-        tier = 5  # exact gloss / synonym: "ฝน."
+        reverse_tier = 5  # exact gloss / synonym: "ฝน."
     elif reverse_strength >= 0.90:
-        tier = 4  # alternative gloss: "เมฆ, ฝน."
+        reverse_tier = 4  # alternative gloss: "เมฆ, ฝน."
     elif reverse_strength >= 0.60:
-        tier = 3  # subtype / kind-of: "ฝนเม็ดใหญ่..."
+        reverse_tier = 3  # subtype / kind-of: "ฝนเม็ดใหญ่..."
     elif reverse_strength > 0:
-        tier = 2  # contextual or associated mention
-    elif forward_strength >= 0.90:
-        tier = 4  # query gloss / alias: "ไว เช่น ..." or "พูดจา ก็ว่า"
-    elif forward_strength >= 0.60:
-        tier = 3  # leading descriptive gloss
-    elif forward_strength >= 0.20:
-        tier = 1  # definition component
+        reverse_tier = 2  # contextual or associated mention
     else:
-        tier = 0  # example mention or distributional similarity only
+        reverse_tier = 0
+
+    if forward_strength >= 0.90:
+        forward_tier = 4  # query gloss / alias: "ไว เช่น ..." or "พูดจา ก็ว่า"
+    elif forward_strength >= 0.60:
+        forward_tier = 3  # leading descriptive gloss
+    elif forward_strength >= 0.20:
+        forward_tier = 1  # definition component
+    else:
+        forward_tier = 0  # example mention or no forward lexical evidence
+
+    tier = max(reverse_tier, forward_tier)
 
     # Dictionary combining forms such as "พรรษ-" are useful metadata but are
     # less directly usable by writers as standalone lexical choices.
