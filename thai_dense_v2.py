@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from time import perf_counter
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -96,7 +97,9 @@ def build_dense_index(
     device: str | None = None,
 ) -> dict[str, Any]:
     profile = resolve_model_profile(model)
+    load_started = perf_counter()
     encoder = load_model(profile, device=device)
+    load_seconds = perf_counter() - load_started
 
     texts = [sense_text(artifacts, sense_id) for sense_id in range(len(artifacts.senses))]
     documents = _prepare_texts(
@@ -104,6 +107,7 @@ def build_dense_index(
         prefix=str(profile.get("document_prefix", "")),
     )
 
+    encode_started = perf_counter()
     embeddings = encoder.encode(
         documents,
         batch_size=batch_size,
@@ -112,6 +116,7 @@ def build_dense_index(
         normalize_embeddings=True,
     )
     embeddings = np.asarray(embeddings, dtype=np.float32)
+    encode_seconds = perf_counter() - encode_started
 
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -128,6 +133,11 @@ def build_dense_index(
         "rows": int(embeddings.shape[0]),
         "dimensions": int(embeddings.shape[1]),
         "dtype": str(embeddings.dtype),
+        "embedding_bytes": int(embeddings.nbytes),
+        "embedding_megabytes": round(float(embeddings.nbytes / (1024 ** 2)), 3),
+        "model_load_seconds": round(float(load_seconds), 3),
+        "encode_seconds": round(float(encode_seconds), 3),
+        "device": str(getattr(encoder, "device", device or "auto")),
         "text_template": "{headword}: {definition}",
     }
     with (out / "dense_metadata.json").open("w", encoding="utf-8") as handle:
