@@ -47,7 +47,7 @@ V1 จะ:
 
 ไฟล์ `thai_word.json` บน `main` มี 39,193 records / 39,193 headwords ไม่ซ้ำ แต่มีเพียง `headword_ID` และ `headword_text` จึงยังใช้สร้าง semantic index ไม่ได้
 
-ให้ใช้ไฟล์พจนานุกรมที่มี `definition_text` สำหรับ build V1 จริง
+สำหรับการทดลอง V1 สาขานี้มี `thai_dictionary_test.json` ที่มี `definition_text` อยู่แล้ว และ pipeline จะเลือกไฟล์นี้โดยอัตโนมัติเมื่อไม่ส่ง path
 
 ## V1 ทำอะไร
 
@@ -76,10 +76,16 @@ pip install -r requirements.txt
 
 ## 1) ตรวจไฟล์พจนานุกรม
 
-สมมุติไฟล์ชื่อ `dictionary_test.json`:
+สาขานี้มีไฟล์ `thai_dictionary_test.json` อยู่แล้ว และถูกตั้งเป็นค่าเริ่มต้นของ pipeline ดังนั้นรันได้ทันที:
 
 ```bash
-python scripts/inspect_dictionary.py dictionary_test.json
+python scripts/inspect_dictionary.py
+```
+
+ถ้าต้องการใช้ไฟล์อื่น ยังส่ง path เองได้:
+
+```bash
+python scripts/inspect_dictionary.py another.json
 ```
 
 ตัว inspector จะรายงาน:
@@ -108,8 +114,7 @@ python scripts/inspect_dictionary.py another.json \
 สำหรับ schema จริง `word_ID / headword_text / definition_text` ไม่ต้องระบุ field เพิ่ม:
 
 ```bash
-python scripts/build_index.py dictionary_test.json \
-  --output artifacts/v1
+python scripts/build_index.py --output artifacts/v1
 ```
 
 Artifacts:
@@ -170,31 +175,24 @@ V1 เหมาะกับ Colab Free เพราะใช้ CPU และ sp
 !pip install -r requirements.txt
 ```
 
-### Cell 3 — upload dictionary
+### Cell 3 — inspect
+
+ไฟล์ `thai_dictionary_test.json` อยู่ใน branch แล้ว ไม่ต้อง upload เพิ่ม:
 
 ```python
-from google.colab import files
-uploaded = files.upload()
+!python scripts/inspect_dictionary.py
 ```
 
-เลือกไฟล์พจนานุกรมที่มี `word_ID`, `headword_text`, `definition_text`
-
-### Cell 4 — inspect
+### Cell 4 — build
 
 ```python
-!python scripts/inspect_dictionary.py dictionary_test.json
+!python scripts/build_index.py --output artifacts/v1
 ```
 
-### Cell 5 — build
+### Cell 5 — search
 
 ```python
-!python scripts/build_index.py dictionary_test.json --output artifacts/v1
-```
-
-### Cell 6 — search
-
-```python
-!python scripts/search.py "ฝน" --index artifacts/v1 --top-k 20
+!python scripts/search.py "พรำ" --index artifacts/v1 --top-k 20
 ```
 
 ## ทรัพยากรเป้าหมาย
