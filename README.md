@@ -70,7 +70,23 @@ E5 ใช้ `query:` ทั้ง query และ dictionary sense เพรา
 !python scripts/build_index.py --output artifacts/v1
 ```
 
-### 3) build E5 dense index
+### 3) ตรวจ GPU ก่อน build dense index
+
+```python
+import torch
+print("torch:", torch.__version__)
+print("torch CUDA build:", torch.version.cuda)
+print("cuda available:", torch.cuda.is_available())
+if torch.cuda.is_available():
+    print("gpu:", torch.cuda.get_device_name(0))
+```
+
+ถ้า `cuda available: False`:
+- ใช้ CPU ได้โดยเอา `--device cuda` ออก หรือปล่อยไว้ก็ได้ เพราะ V2 จะ fallback เป็น CPU พร้อม warning
+- ถ้าต้องการ GPU บน Colab ให้เปลี่ยน runtime เป็น GPU แล้วรัน cell ตรวจนี้ใหม่ก่อน build
+- warning เรื่อง `HF_TOKEN` ไม่ใช่ error สำหรับ public models; token มีผลหลักเรื่อง rate limit/download
+
+### 4) build E5 dense index
 
 ```python
 !python scripts/build_dense_index.py \
@@ -81,7 +97,7 @@ E5 ใช้ `query:` ทั้ง query และ dictionary sense เพรา
   --batch-size 64
 ```
 
-### 4) build GTE challenger
+### 5) build GTE challenger
 
 ```python
 !python scripts/build_dense_index.py \
@@ -92,9 +108,9 @@ E5 ใช้ `query:` ทั้ง query และ dictionary sense เพรา
   --batch-size 32
 ```
 
-ถ้า Colab session ไม่มี GPU ให้เอา `--device cuda` ออก ระบบจะใช้ device ที่ Sentence Transformers เลือกให้
+ถ้า Colab session ไม่มี GPU จะเอา `--device cuda` ออกก็ได้ หรือคงไว้ได้เช่นกัน เพราะระบบจะตรวจ CUDA และ fallback ไป CPU โดยอัตโนมัติ
 
-### 5) ทดลอง hybrid search
+### 6) ทดลอง hybrid search
 
 ```python
 !python scripts/search_v2.py "พูด" \
@@ -115,7 +131,7 @@ E5 ใช้ `query:` ทั้ง query และ dictionary sense เพรา
   --device cuda
 ```
 
-### 6) benchmark V1 vs E5 vs GTE
+### 7) benchmark V1 vs E5 vs GTE
 
 ```python
 !python scripts/evaluate_v2.py \
