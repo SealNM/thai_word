@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import gc
 import json
 import sys
 from pathlib import Path
@@ -47,10 +48,6 @@ def main() -> None:
 
     config = _load_config(args.config)
     lexical = load_artifacts(args.index)
-    searchers = [
-        HybridSearcher.from_paths(lexical, path, device=args.device)
-        for path in args.dense_index
-    ]
 
     report: dict[str, Any] = {
         "config": args.config,
@@ -62,14 +59,7 @@ def main() -> None:
             "dense_weight": args.dense_weight,
             "rrf_k": args.rrf_k,
         },
-        "models": [
-            {
-                "dense_index": path,
-                "model_id": searcher.dense.metadata.get("model_id"),
-                "dimensions": searcher.dense.metadata.get("dimensions"),
-            }
-            for path, searcher in zip(args.dense_index, searchers)
-        ],
+        "models": [],
         "queries": [],
     }
 
@@ -86,25 +76,6 @@ def main() -> None:
             top_k=args.top_k,
             sense=sense,
         )
-
-        model_results = []
-        for path, searcher in zip(args.dense_index, searchers):
-            results = searcher.search(
-                query,
-                top_k=args.top_k,
-                sense=sense,
-                lexical_weight=args.lexical_weight,
-                dense_weight=args.dense_weight,
-                rrf_k=args.rrf_k,
-            )
-            model_results.append(
-                {
-                    "dense_index": path,
-                    "model_id": searcher.dense.metadata.get("model_id"),
-                    "results": results,
-                }
-            )
-
         report["queries"].append(
             {
                 "query": query,
@@ -112,9 +83,48 @@ def main() -> None:
                 "sense": sense,
                 "available_senses": available,
                 "v1": baseline,
-                "v2": model_results,
+                "v2": [],
             }
         )
+
+    # Load one dense model at a time to keep peak Colab memory low.
+    for path in args.dense_index:
+        searcher = HybridSearcher.from_paths(lexical, path, device=args.device)
+        model_id = searcher.dense.metadata.get("model_id")
+        report["models"].append(
+            {
+                "dense_index": path,
+                "model_id": model_id,
+                "dimensions": searcher.dense.metadata.get("dimensions"),
+            }
+        )
+
+        for item in report["queries"]:
+            results = searcher.search(
+                item["query"],
+                top_k=args.top_k,
+                sense=item["sense"],
+                lexical_weight=args.lexical_weight,
+                dense_weight=args.dense_weight,
+                rrf_k=args.rrf_k,
+            )
+            item["v2"].append(
+                {
+                    "dense_index": path,
+                    "model_id": model_id,
+                    "results": results,
+                }
+            )
+
+        del searcher
+        gc.collect()
+        try:
+            import torch
+
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except ImportError:
+            pass
 
     for item in report["queries"]:
         print(f"\n=== {item['query']} [{item.get('category')}] ===")
