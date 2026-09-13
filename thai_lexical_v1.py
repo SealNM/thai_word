@@ -17,7 +17,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import linear_kernel
 
 
-ARTIFACT_VERSION = 1
+ARTIFACT_VERSION = 2
 DEFAULT_INPUT_PATH = "thai_dictionary.json"
 DEFAULT_ID_FIELD = "word_ID"
 DEFAULT_WORD_FIELD = "headword_text"
@@ -207,10 +207,27 @@ def build_index(
     entries = prepare_entries(records, id_field, word_field, definition_field)
     words = [row["word"] for row in entries]
     tokenize = _thai_tokenizer(words)
+    word_to_index = {word: i for i, word in enumerate(words)}
 
-    token_lists = [tokenize(row["definition"]) for row in entries]
+    senses: list[dict[str, Any]] = []
+    token_lists: list[list[str]] = []
+    entry_to_senses: list[list[int]] = [[] for _ in entries]
+
+    for entry_index, entry in enumerate(entries):
+        for sense_index, definition in enumerate(entry["definitions"], start=1):
+            sense_id = len(senses)
+            tokens = tokenize(definition)
+            senses.append(
+                {
+                    "entry_index": entry_index,
+                    "sense_index": sense_index,
+                    "definition": definition,
+                }
+            )
+            token_lists.append(tokens)
+            entry_to_senses[entry_index].append(sense_id)
+
     tokenized_definitions = [" ".join(tokens) for tokens in token_lists]
-
     vectorizer = TfidfVectorizer(
         tokenizer=split_tokens,
         preprocessor=None,
@@ -225,21 +242,24 @@ def build_index(
     )
     matrix = vectorizer.fit_transform(tokenized_definitions).tocsr()
 
-    word_to_index = {word: i for i, word in enumerate(words)}
     references: list[list[int]] = []
     token_sets: list[set[str]] = []
+    reverse_reference_senses: list[list[int]] = [[] for _ in entries]
 
-    for i, tokens in enumerate(token_lists):
+    for sense_id, tokens in enumerate(token_lists):
         unique_tokens = set(tokens)
         token_sets.append(unique_tokens)
+        own_entry_index = senses[sense_id]["entry_index"]
         refs = sorted(
             {
                 word_to_index[token]
                 for token in unique_tokens
-                if token in word_to_index and word_to_index[token] != i
+                if token in word_to_index and word_to_index[token] != own_entry_index
             }
         )
         references.append(refs)
+        for referenced_entry in refs:
+            reverse_reference_senses[referenced_entry].append(sense_id)
 
     out = Path(output_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -247,13 +267,18 @@ def build_index(
     with (out / "entries.json").open("w", encoding="utf-8") as handle:
         json.dump(entries, handle, ensure_ascii=False)
 
+    with (out / "senses.json").open("w", encoding="utf-8") as handle:
+        json.dump(senses, handle, ensure_ascii=False)
+
     with (out / "word_to_index.json").open("w", encoding="utf-8") as handle:
         json.dump(word_to_index, handle, ensure_ascii=False)
 
     sparse.save_npz(out / "tfidf_matrix.npz", matrix)
     joblib.dump(vectorizer, out / "vectorizer.joblib", compress=3)
     joblib.dump(references, out / "references.joblib", compress=3)
+    joblib.dump(reverse_reference_senses, out / "reverse_references.joblib", compress=3)
     joblib.dump(token_sets, out / "token_sets.joblib", compress=3)
+    joblib.dump(entry_to_senses, out / "entry_to_senses.joblib", compress=3)
 
     metadata = {
         "artifact_version": ARTIFACT_VERSION,
@@ -264,11 +289,12 @@ def build_index(
         "definition_field": definition_field,
         "records_input": len(records),
         "entries_indexed": len(entries),
-        "senses_indexed": sum(row["sense_count"] for row in entries),
+        "senses_indexed": len(senses),
         "features": int(matrix.shape[1]),
         "matrix_shape": [int(matrix.shape[0]), int(matrix.shape[1])],
         "matrix_nnz": int(matrix.nnz),
         "matrix_dtype": str(matrix.dtype),
+        "representation": "sense_level",
     }
     with (out / "metadata.json").open("w", encoding="utf-8") as handle:
         json.dump(metadata, handle, ensure_ascii=False, indent=2)
@@ -279,11 +305,14 @@ def build_index(
 @dataclass
 class SearchArtifacts:
     entries: list[dict[str, Any]]
+    senses: list[dict[str, Any]]
     word_to_index: dict[str, int]
     vectorizer: TfidfVectorizer
     matrix: sparse.csr_matrix
     references: list[list[int]]
+    reverse_references: list[list[int]]
     token_sets: list[set[str]]
+    entry_to_senses: list[list[int]]
     tokenize: Any
 
 
@@ -291,24 +320,48 @@ def load_artifacts(output_dir: str | Path) -> SearchArtifacts:
     out = Path(output_dir)
     with (out / "entries.json").open("r", encoding="utf-8") as handle:
         entries = json.load(handle)
+    with (out / "senses.json").open("r", encoding="utf-8") as handle:
+        senses = json.load(handle)
     with (out / "word_to_index.json").open("r", encoding="utf-8") as handle:
         word_to_index = {key: int(value) for key, value in json.load(handle).items()}
 
     vectorizer = joblib.load(out / "vectorizer.joblib")
     matrix = sparse.load_npz(out / "tfidf_matrix.npz").tocsr()
     references = joblib.load(out / "references.joblib")
+    reverse_references = joblib.load(out / "reverse_references.joblib")
     token_sets = joblib.load(out / "token_sets.joblib")
+    entry_to_senses = joblib.load(out / "entry_to_senses.joblib")
     tokenize = _thai_tokenizer(word_to_index.keys())
 
     return SearchArtifacts(
         entries=entries,
+        senses=senses,
         word_to_index=word_to_index,
         vectorizer=vectorizer,
         matrix=matrix,
         references=references,
+        reverse_references=reverse_references,
         token_sets=token_sets,
+        entry_to_senses=entry_to_senses,
         tokenize=tokenize,
     )
+
+
+def list_senses(artifacts: SearchArtifacts, query: str) -> list[dict[str, Any]]:
+    query = normalize_text(query)
+    entry_index = artifacts.word_to_index.get(query)
+    if entry_index is None:
+        return []
+    result = []
+    for sense_id in artifacts.entry_to_senses[entry_index]:
+        sense = artifacts.senses[sense_id]
+        result.append(
+            {
+                "sense": int(sense["sense_index"]),
+                "definition": sense["definition"],
+            }
+        )
+    return result
 
 
 def _jaccard(left: set[str], right: set[str]) -> float:
@@ -318,83 +371,171 @@ def _jaccard(left: set[str], right: set[str]) -> float:
     return len(left & right) / len(union) if union else 0.0
 
 
+def _top_indices(scores: np.ndarray, count: int) -> np.ndarray:
+    if count <= 0:
+        return np.array([], dtype=np.int64)
+    count = min(count, len(scores))
+    if count == len(scores):
+        return np.argsort(-scores)
+    raw = np.argpartition(-scores, count - 1)[:count]
+    return raw[np.argsort(-scores[raw])]
+
+
 def search(
     artifacts: SearchArtifacts,
     query: str,
     *,
     top_k: int = 20,
     candidate_pool: int = 250,
+    sense: int | None = None,
 ) -> list[dict[str, Any]]:
     query = normalize_text(query)
     if not query:
         return []
 
-    query_index = artifacts.word_to_index.get(query)
-    if query_index is not None:
-        query_vector = artifacts.matrix[query_index]
-        query_tokens = artifacts.token_sets[query_index]
-        query_refs = set(artifacts.references[query_index])
+    query_entry_index = artifacts.word_to_index.get(query)
+
+    if query_entry_index is not None:
+        available_query_senses = artifacts.entry_to_senses[query_entry_index]
+        if not available_query_senses:
+            return []
+        if sense is None:
+            selected_query_senses = [available_query_senses[0]]
+        else:
+            if sense < 1 or sense > len(available_query_senses):
+                raise ValueError(
+                    f"Sense {sense} is out of range for {query!r}; "
+                    f"available senses: 1-{len(available_query_senses)}"
+                )
+            selected_query_senses = [available_query_senses[sense - 1]]
+
+        query_matrix = artifacts.matrix[selected_query_senses]
+        query_token_sets = [artifacts.token_sets[sense_id] for sense_id in selected_query_senses]
+        query_reference_sets = [set(artifacts.references[sense_id]) for sense_id in selected_query_senses]
     else:
+        if sense is not None:
+            raise ValueError("--sense can only be used when the query exactly matches a dictionary headword.")
         query_tokens_list = artifacts.tokenize(query)
-        query_tokens = set(query_tokens_list)
-        query_vector = artifacts.vectorizer.transform([" ".join(query_tokens_list)])
-        query_refs = set()
+        if not query_tokens_list:
+            return []
+        query_matrix = artifacts.vectorizer.transform([" ".join(query_tokens_list)])
+        selected_query_senses = []
+        query_token_sets = [set(query_tokens_list)]
+        query_reference_sets = [set()]
 
-    cosine_scores = linear_kernel(query_vector, artifacts.matrix).ravel()
-    total = len(cosine_scores)
-    pool_size = min(max(top_k * 5, candidate_pool), total)
+    pair_cosine = linear_kernel(query_matrix, artifacts.matrix)
+    if pair_cosine.ndim == 1:
+        pair_cosine = pair_cosine.reshape(1, -1)
+    sense_cosine = np.asarray(pair_cosine).max(axis=0)
 
-    if pool_size == total:
-        candidate_indices = np.argsort(-cosine_scores)
-    else:
-        raw = np.argpartition(-cosine_scores, pool_size - 1)[:pool_size]
-        candidate_indices = raw[np.argsort(-cosine_scores[raw])]
+    entry_cosine = np.full(len(artifacts.entries), -1.0, dtype=np.float32)
+    for sense_id, cosine in enumerate(sense_cosine):
+        entry_index = int(artifacts.senses[sense_id]["entry_index"])
+        if cosine > entry_cosine[entry_index]:
+            entry_cosine[entry_index] = float(cosine)
+
+    pool_size = min(max(top_k * 5, candidate_pool), len(artifacts.entries))
+    candidate_entries = set(map(int, _top_indices(entry_cosine, pool_size)))
+
+    if query_entry_index is not None:
+        for refs in query_reference_sets:
+            candidate_entries.update(refs)
+        for sense_id in artifacts.reverse_references[query_entry_index]:
+            candidate_entries.add(int(artifacts.senses[sense_id]["entry_index"]))
+        candidate_entries.discard(query_entry_index)
 
     results: list[dict[str, Any]] = []
-    for idx_value in candidate_indices:
-        idx = int(idx_value)
-        if query_index is not None and idx == query_index:
-            continue
-
-        candidate = artifacts.entries[idx]
-        cosine = float(cosine_scores[idx])
-        candidate_refs = set(artifacts.references[idx])
-
-        forward_ref = 1.0 if idx in query_refs else 0.0
-        reverse_ref = 1.0 if query_index is not None and query_index in candidate_refs else 0.0
-        direct_reference = max(forward_ref, reverse_ref)
-
-        shared = _jaccard(query_tokens, artifacts.token_sets[idx])
+    for entry_index in candidate_entries:
+        candidate = artifacts.entries[entry_index]
         word_form = SequenceMatcher(None, query, candidate["word"]).ratio()
 
-        score = (
-            0.55 * cosine
-            + 0.25 * direct_reference
-            + 0.15 * shared
-            + 0.05 * word_form
-        )
+        best: dict[str, Any] | None = None
+        for candidate_sense_id in artifacts.entry_to_senses[entry_index]:
+            candidate_tokens = artifacts.token_sets[candidate_sense_id]
+            candidate_refs = set(artifacts.references[candidate_sense_id])
 
-        if forward_ref:
-            relation_hint = "definition_mentions_candidate"
-        elif reverse_ref:
-            relation_hint = "candidate_defined_via_query"
-        elif query in candidate["word"] or candidate["word"] in query:
-            relation_hint = "compound_or_form_related"
-        else:
-            relation_hint = "definition_similar"
+            for query_position in range(pair_cosine.shape[0]):
+                cosine = float(pair_cosine[query_position, candidate_sense_id])
+                query_tokens = query_token_sets[query_position]
+                query_refs = query_reference_sets[query_position]
+
+                forward_ref = 1.0 if entry_index in query_refs else 0.0
+                reverse_ref = (
+                    1.0
+                    if query_entry_index is not None and query_entry_index in candidate_refs
+                    else 0.0
+                )
+                direct_reference = max(forward_ref, reverse_ref)
+                shared = _jaccard(query_tokens, candidate_tokens)
+
+                score = (
+                    0.55 * cosine
+                    + 0.25 * direct_reference
+                    + 0.15 * shared
+                    + 0.05 * word_form
+                )
+
+                if forward_ref and reverse_ref:
+                    relation_hint = "mutual_definition_reference"
+                elif forward_ref:
+                    relation_hint = "definition_mentions_candidate"
+                elif reverse_ref:
+                    relation_hint = "candidate_defined_via_query"
+                elif query in candidate["word"] or candidate["word"] in query:
+                    relation_hint = "compound_or_form_related"
+                else:
+                    relation_hint = "definition_similar"
+
+                if best is None or score > best["score_raw"]:
+                    query_sense_id = (
+                        selected_query_senses[query_position]
+                        if selected_query_senses
+                        else None
+                    )
+                    best = {
+                        "score_raw": float(score),
+                        "cosine": cosine,
+                        "direct_reference": direct_reference,
+                        "shared": shared,
+                        "relation_hint": relation_hint,
+                        "candidate_sense_id": candidate_sense_id,
+                        "query_sense_id": query_sense_id,
+                    }
+
+        if best is None:
+            continue
+
+        candidate_sense = artifacts.senses[best["candidate_sense_id"]]
+        query_sense_record = (
+            artifacts.senses[best["query_sense_id"]]
+            if best["query_sense_id"] is not None
+            else None
+        )
 
         results.append(
             {
                 "word": candidate["word"],
-                "score": round(float(score), 6),
-                "relation_hint": relation_hint,
+                "score": round(best["score_raw"], 6),
+                "relation_hint": best["relation_hint"],
                 "signals": {
-                    "definition_cosine": round(cosine, 6),
-                    "direct_reference": direct_reference,
-                    "shared_tokens": round(shared, 6),
+                    "definition_cosine": round(best["cosine"], 6),
+                    "direct_reference": best["direct_reference"],
+                    "shared_tokens": round(best["shared"], 6),
                     "word_form": round(float(word_form), 6),
                 },
-                "definition": candidate["definition"],
+                "query_sense": (
+                    {
+                        "sense": int(query_sense_record["sense_index"]),
+                        "definition": query_sense_record["definition"],
+                    }
+                    if query_sense_record is not None
+                    else None
+                ),
+                "matched_candidate_sense": {
+                    "sense": int(candidate_sense["sense_index"]),
+                    "definition": candidate_sense["definition"],
+                },
+                "definition": candidate_sense["definition"],
                 "sense_count": candidate.get("sense_count", 1),
                 "source_ids": candidate.get("source_ids", []),
             }
