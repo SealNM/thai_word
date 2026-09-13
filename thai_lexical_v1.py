@@ -371,6 +371,69 @@ def _jaccard(left: set[str], right: set[str]) -> float:
     return len(left & right) / len(union) if union else 0.0
 
 
+def _reference_strength(definition: str, target_word: str) -> float:
+    """Estimate whether a headword mention is definitional or merely contextual.
+
+    This intentionally stays dictionary-only. A bare/alternative gloss such as
+    "ฝน." or "เมฆ, ฝน." is much stronger than an example such as
+    "เช่น เมฆอุ้มฝน" or an associated concept such as "เทวดาแห่งฝน".
+    """
+    definition = normalize_text(definition)
+    target_word = normalize_text(target_word)
+    if not definition or not target_word or target_word not in definition:
+        return 0.0
+
+    stripped = definition.strip(" \t\r\n.,;:!?()[]{}“”‘’\"'")
+    if stripped == target_word:
+        return 1.0
+
+    clauses = [
+        part.strip(" \t\r\n.,;:!?()[]{}“”‘’\"'")
+        for part in re.split(r"[,;]", definition)
+    ]
+    if any(part == target_word for part in clauses):
+        return 0.95
+
+    target_pos = definition.find(target_word)
+    prefix = definition[:target_pos]
+
+    contextual_markers = (
+        "เช่น",
+        "เช่นว่า",
+        "ตัวอย่าง",
+        "ในคำว่า",
+        "ใช้ว่า",
+        "อาทิ",
+    )
+    if any(marker in prefix for marker in contextual_markers):
+        return 0.20
+
+    associated_markers = (
+        "แห่ง",
+        "ไม่มี",
+        "ปราศจาก",
+        "เกี่ยวกับ",
+        "สำหรับ",
+    )
+    if any(prefix.rstrip().endswith(marker) for marker in associated_markers):
+        return 0.15
+
+    first_clause = clauses[0] if clauses else stripped
+    if first_clause.startswith(target_word):
+        # "ฝนเม็ดใหญ่..." / "ฝนชนิด..." are useful type-of relations,
+        # but weaker than a direct gloss "ฝน."
+        return 0.65
+
+    if target_word in first_clause:
+        return 0.50
+
+    alias_markers = ("เรียกว่า", "ก็เรียก", "หรือเรียก")
+    if any(marker in definition for marker in alias_markers):
+        return 0.45
+
+    return 0.30
+
+
 def _top_indices(scores: np.ndarray, count: int) -> np.ndarray:
     if count <= 0:
         return np.array([], dtype=np.int64)
@@ -459,43 +522,68 @@ def search(
                 query_tokens = query_token_sets[query_position]
                 query_refs = query_reference_sets[query_position]
 
+                query_sense_id = (
+                    selected_query_senses[query_position]
+                    if selected_query_senses
+                    else None
+                )
+                query_definition = (
+                    artifacts.senses[query_sense_id]["definition"]
+                    if query_sense_id is not None
+                    else query
+                )
+
                 forward_ref = 1.0 if entry_index in query_refs else 0.0
                 reverse_ref = (
                     1.0
                     if query_entry_index is not None and query_entry_index in candidate_refs
                     else 0.0
                 )
-                direct_reference = max(forward_ref, reverse_ref)
+                forward_strength = (
+                    _reference_strength(query_definition, candidate["word"])
+                    if forward_ref
+                    else 0.0
+                )
+                reverse_strength = (
+                    _reference_strength(candidate_sense["definition"], query)
+                    if reverse_ref
+                    else 0.0
+                )
                 shared = _jaccard(query_tokens, candidate_tokens)
 
+                # Reverse references answer "what is this word defined as?" and are
+                # the strongest lexical signal. Forward references mostly describe
+                # components of the query definition (e.g. ฝน -> เมฆ/เม็ด), so they
+                # deliberately receive much less weight.
                 score = (
-                    0.55 * cosine
-                    + 0.25 * direct_reference
-                    + 0.15 * shared
+                    0.35 * cosine
+                    + 0.40 * reverse_strength
+                    + 0.03 * forward_strength
+                    + 0.17 * shared
                     + 0.05 * word_form
                 )
 
                 if forward_ref and reverse_ref:
                     relation_hint = "mutual_definition_reference"
-                elif forward_ref:
-                    relation_hint = "definition_mentions_candidate"
+                elif reverse_ref and reverse_strength >= 0.90:
+                    relation_hint = "direct_gloss_or_synonym"
+                elif reverse_ref and reverse_strength >= 0.60:
+                    relation_hint = "defined_as_kind_of_query"
                 elif reverse_ref:
-                    relation_hint = "candidate_defined_via_query"
+                    relation_hint = "candidate_mentions_query"
+                elif forward_ref:
+                    relation_hint = "query_definition_mentions_candidate"
                 elif query in candidate["word"] or candidate["word"] in query:
                     relation_hint = "compound_or_form_related"
                 else:
                     relation_hint = "definition_similar"
 
                 if best is None or score > best["score_raw"]:
-                    query_sense_id = (
-                        selected_query_senses[query_position]
-                        if selected_query_senses
-                        else None
-                    )
                     best = {
                         "score_raw": float(score),
                         "cosine": cosine,
-                        "direct_reference": direct_reference,
+                        "forward_reference": forward_strength,
+                        "reverse_reference": reverse_strength,
                         "shared": shared,
                         "relation_hint": relation_hint,
                         "candidate_sense_id": candidate_sense_id,
@@ -519,7 +607,8 @@ def search(
                 "relation_hint": best["relation_hint"],
                 "signals": {
                     "definition_cosine": round(best["cosine"], 6),
-                    "direct_reference": best["direct_reference"],
+                    "reverse_reference": round(best["reverse_reference"], 6),
+                    "forward_reference": round(best["forward_reference"], 6),
                     "shared_tokens": round(best["shared"], 6),
                     "word_form": round(float(word_form), 6),
                 },
