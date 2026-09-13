@@ -673,11 +673,28 @@ def search(
                     else 0.0
                 )
                 shared = _jaccard(query_tokens, candidate_tokens)
+                entry_semantic_cosine = max(0.0, float(entry_cosine[entry_index]))
+                sense_reference_ambiguous = bool(
+                    query_entry_index is not None
+                    and len(available_query_senses) > 1
+                    and reverse_strength >= 0.90
+                    and entry_semantic_cosine < 0.02
+                    and shared == 0.0
+                )
+
                 relation_tier = _relation_tier(
                     reverse_strength=reverse_strength,
                     forward_strength=forward_strength,
                     candidate_word=candidate["word"],
                 )
+
+                # An explicitly selected sense is strict. A bare gloss such as
+                # "รัก." points only to the ambiguous headword and cannot prove
+                # which homonym/sense it means. Keep it visible, but do not let
+                # it outrank evidence tied to the selected sense.
+                if sense is not None and sense_reference_ambiguous:
+                    relation_tier = min(relation_tier, 2)
+
                 score = _hierarchical_score(
                     relation_tier,
                     cosine=cosine,
@@ -686,7 +703,9 @@ def search(
                     exact_headword_query=query_entry_index is not None,
                 )
 
-                if forward_ref and reverse_ref:
+                if sense is not None and sense_reference_ambiguous:
+                    relation_hint = "ambiguous_headword_reference"
+                elif forward_ref and reverse_ref:
                     relation_hint = "mutual_definition_reference"
                 elif reverse_ref and reverse_strength >= 0.999:
                     relation_hint = "direct_gloss_or_synonym"
@@ -723,13 +742,8 @@ def search(
                         "relation_hint": relation_hint,
                         "candidate_sense_id": candidate_sense_id,
                         "query_sense_id": query_sense_id,
-                        "sense_reference_ambiguous": bool(
-                            query_entry_index is not None
-                            and len(available_query_senses) > 1
-                            and reverse_strength >= 0.90
-                            and cosine == 0.0
-                            and shared == 0.0
-                        ),
+                        "sense_reference_ambiguous": sense_reference_ambiguous,
+                        "entry_semantic_cosine": entry_semantic_cosine,
                     }
 
         if best is None:
@@ -760,6 +774,7 @@ def search(
                     "forward_reference": round(best["forward_reference"], 6),
                     "shared_tokens": round(best["shared"], 6),
                     "word_form": round(float(word_form), 6),
+                    "entry_semantic_cosine": round(best["entry_semantic_cosine"], 6),
                 },
                 "query_sense": (
                     {
