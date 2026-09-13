@@ -158,6 +158,14 @@ class SenseAwareSearchTests(unittest.TestCase):
         )
         self.assertGreater(pure_score, alternative_score)
 
+    def test_strong_forward_gloss_beats_weak_reverse_context(self) -> None:
+        tier = _relation_tier(
+            reverse_strength=0.50,
+            forward_strength=0.70,
+            candidate_word="ลับ",
+        )
+        self.assertEqual(tier, 3)
+
     def test_bound_form_is_demoted_one_relation_tier(self) -> None:
         standalone = _relation_tier(
             reverse_strength=1.0,
