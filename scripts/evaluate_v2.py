@@ -94,10 +94,14 @@ def main() -> None:
         searcher = HybridSearcher.from_paths(lexical, path, device=args.device)
         load_seconds = perf_counter() - load_started
         model_id = searcher.dense.metadata.get("model_id")
+        model_key = searcher.dense.metadata.get("model_key", model_id)
+        dimensions = searcher.dense.metadata.get("dimensions")
         model_report = {
             "dense_index": path,
+            "model_key": model_key,
             "model_id": model_id,
-            "dimensions": searcher.dense.metadata.get("dimensions"),
+            "dimensions": dimensions,
+            "truncate_dim": searcher.dense.metadata.get("truncate_dim"),
             "model_load_seconds": round(float(load_seconds), 3),
         }
         report["models"].append(model_report)
@@ -115,7 +119,9 @@ def main() -> None:
             item["v2"].append(
                 {
                     "dense_index": path,
+                    "model_key": model_key,
                     "model_id": model_id,
+                    "dimensions": dimensions,
                     "results": results,
                 }
             )
@@ -145,7 +151,10 @@ def main() -> None:
             print(f"WARNING: {len(senses)} raw senses; config has no explicit sense.")
         print("V1      :", " | ".join(_words(item["v1"], args.top_k)))
         for model in item["v2"]:
-            label = model["model_id"]
+            label = model.get("model_key") or model["model_id"]
+            dimensions = model.get("dimensions")
+            if dimensions:
+                label = f"{label}/{dimensions}d"
             print(f"V2 {label}: " + " | ".join(_words(model["results"], args.top_k)))
 
     if args.output:
