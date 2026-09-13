@@ -30,7 +30,7 @@ def main() -> None:
     parser.add_argument(
         "--device",
         default=None,
-        help="Optional sentence-transformers device, e.g. cuda or cpu.",
+        help="Optional device, e.g. cuda or cpu. CUDA requests safely fall back to CPU when unavailable.",
     )
     args = parser.parse_args()
 
