@@ -18,7 +18,7 @@ from sklearn.metrics.pairwise import linear_kernel
 
 
 ARTIFACT_VERSION = 1
-DEFAULT_INPUT_PATH = "thai_dictionary_test.json"
+DEFAULT_INPUT_PATH = "thai_dictionary.json"
 DEFAULT_ID_FIELD = "word_ID"
 DEFAULT_WORD_FIELD = "headword_text"
 DEFAULT_DEFINITION_FIELD = "definition_text"
