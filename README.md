@@ -2,49 +2,63 @@
 
 Baseline สำหรับค้นหาคำภาษาไทยที่มีความหมายใกล้เคียงกันจาก **คำศัพท์ + ความหมายในพจนานุกรมเท่านั้น** โดยยังไม่ใช้ LLM, external embedding API, corpus ภายนอก หรือ GPU
 
-## สถานะข้อมูลปัจจุบัน
+## Schema จริงที่ V1 ใช้เป็นค่าเริ่มต้น
 
-จาก \`thai_word.json\` บน \`main\`:
+จากตัวอย่างข้อมูลพจนานุกรมจริง:
 
-- 39,193 records
-- 39,193 headwords ไม่ซ้ำ
-- schema ปัจจุบันมีเพียง \`headword_ID\` และ \`headword_text\`
-- ยังไม่มีฟิลด์ความหมาย จึงยังสร้าง semantic index จริงไม่ได้
-
-ตัว engine จะไม่สร้างผลลัพธ์ปลอมจากชื่อคำเพียงอย่างเดียว และจะหยุดพร้อมแจ้ง schema ที่ขาด
-
-## Schema ที่ V1 ต้องการ
-
-ตัวอย่างขั้นต่ำ:
-
-\`\`\`json
+```json
 [
   {
-    "headword_ID": 27109,
-    "headword_text": "ฝน",
-    "definition": "น้ำที่ตกลงมาจากเมฆเป็นเม็ด ๆ"
+    "word_ID": 27959,
+    "headword_text": "พรำ",
+    "definition_text": "ตกน้อย ๆ เรื่อยไป (ใช้แก่ฝน) ในคำว่า ฝนพรำ."
   },
   {
-    "headword_ID": 27110,
-    "headword_text": "ฝนพรำ",
-    "definition": "ฝนที่ตกเป็นเม็ดเล็ก ๆ เรื่อย ๆ"
+    "word_ID": 27960,
+    "headword_text": "พรำ",
+    "definition_text": "อาการที่ฝนตกน้อย ๆ เรื่อยไป ใช้ว่า ฝนตกพรำ ฝนตกพรำ ๆ."
   }
 ]
-\`\`\`
+```
 
-ถ้าข้อมูลจริงใช้ชื่อฟิลด์อื่น ไม่จำเป็นต้องแก้ไฟล์ สามารถส่ง \`--word-field\` และ \`--definition-field\` ให้ CLI ได้
+ค่า default ของ pipeline คือ:
 
-ค่า definition รองรับ string, list หรือ nested object และจะถูกรวมเป็นข้อความก่อนประมวลผล
+- ID: `word_ID`
+- คำ: `headword_text`
+- ความหมาย: `definition_text`
+
+ถ้า dataset รุ่นอื่นใช้ชื่อฟิลด์ต่างออกไป ยัง override ได้ด้วย `--id-field`, `--word-field` และ `--definition-field`
+
+## คำเดียวหลายความหมาย
+
+พจนานุกรมจริงมีหลาย records ที่ใช้ `headword_text` เดียวกันแต่คนละ `word_ID` / คนละความหมาย เช่น `พรำ`
+
+V1 จะ:
+
+1. รวม records ที่มี headword เดียวกันเป็น semantic entry เดียว
+2. เก็บทุกความหมายที่ไม่ซ้ำ
+3. เก็บ `source_ids` ของทุก record
+4. เก็บ `sense_count`
+5. ใช้ความหมายทั้งหมดร่วมกันในการสร้าง representation
+
+จึงไม่ทิ้ง sense อื่นของคำเดียวกัน
+
+## สถานะ `thai_word.json` เดิมใน repo
+
+ไฟล์ `thai_word.json` บน `main` มี 39,193 records / 39,193 headwords ไม่ซ้ำ แต่มีเพียง `headword_ID` และ `headword_text` จึงยังใช้สร้าง semantic index ไม่ได้
+
+ให้ใช้ไฟล์พจนานุกรมที่มี `definition_text` สำหรับ build V1 จริง
 
 ## V1 ทำอะไร
 
 1. Unicode/whitespace normalization
-2. ตัดคำไทยด้วย PyThaiNLP \`newmm\`
+2. ตัดคำไทยด้วย PyThaiNLP `newmm`
 3. ใช้ headwords ทั้งชุดเป็น custom dictionary เพื่อรักษาคำเฉพาะ/คำประสม
 4. ตัด Thai stopwords
-5. สร้าง word + bigram TF-IDF จากความหมาย
-6. สร้าง direct lexical references เมื่อความหมายกล่าวถึง headword อื่น
-7. จัดอันดับจาก:
+5. รวม multiple senses ของ headword เดียวกัน
+6. สร้าง word + bigram TF-IDF จากความหมาย
+7. สร้าง direct lexical references เมื่อความหมายกล่าวถึง headword อื่น
+8. จัดอันดับจาก:
    - definition cosine similarity 55%
    - direct definition reference 25%
    - shared definition tokens 15%
@@ -54,37 +68,53 @@ Baseline สำหรับค้นหาคำภาษาไทยที่�
 
 ## ติดตั้ง
 
-\`\`\`bash
+```bash
 pip install -r requirements.txt
-\`\`\`
+```
 
 ใช้ CPU เท่านั้น ไม่ต้องมี GPU
 
-## 1) ตรวจข้อมูลก่อน
+## 1) ตรวจไฟล์พจนานุกรม
 
-\`\`\`bash
-python scripts/inspect_dictionary.py thai_word.json
-\`\`\`
+สมมุติไฟล์ชื่อ `dictionary_test.json`:
 
-กับข้อมูลปัจจุบันจะรายงานว่า definition coverage = 0 และหยุดก่อน build
+```bash
+python scripts/inspect_dictionary.py dictionary_test.json
+```
 
-ถ้าความหมายอยู่ในฟิลด์ชื่อ \`meaning\`:
+ตัว inspector จะรายงาน:
 
-\`\`\`bash
-python scripts/inspect_dictionary.py thai_word.json --definition-field meaning
-\`\`\`
+- จำนวน records
+- จำนวน ID
+- จำนวน headwords
+- จำนวนคำไม่ซ้ำ
+- จำนวน duplicate headword rows
+- definition coverage
+- schema fields ที่พบ
+
+ถ้า definition coverage เป็น 0 ระบบจะหยุดก่อน build เพื่อไม่สร้าง semantic index จากชื่อคำเพียงอย่างเดียว
+
+### Dataset ที่ใช้ชื่อฟิลด์อื่น
+
+```bash
+python scripts/inspect_dictionary.py another.json \
+  --id-field id \
+  --word-field word \
+  --definition-field meaning
+```
 
 ## 2) สร้าง index
 
-\`\`\`bash
-python scripts/build_index.py thai_word.json \
-  --definition-field definition \
+สำหรับ schema จริง `word_ID / headword_text / definition_text` ไม่ต้องระบุ field เพิ่ม:
+
+```bash
+python scripts/build_index.py dictionary_test.json \
   --output artifacts/v1
-\`\`\`
+```
 
 Artifacts:
 
-\`\`\`text
+```text
 artifacts/v1/
 ├── entries.json
 ├── metadata.json
@@ -93,36 +123,87 @@ artifacts/v1/
 ├── token_sets.joblib
 ├── vectorizer.joblib
 └── word_to_index.json
-\`\`\`
+```
+
+`metadata.json` จะมีทั้ง `entries_indexed` และ `senses_indexed` เพื่อแยกจำนวน headwords หลัง merge ออกจากจำนวนความหมายที่ใช้จริง
 
 ## 3) ทดลองค้นหา
 
-\`\`\`bash
+```bash
 python scripts/search.py "ฝน" --index artifacts/v1 --top-k 20
-\`\`\`
+```
 
-ผลลัพธ์แต่ละคำจะมีคะแนนรวม, relation hint และคะแนนย่อย เพื่อให้ตรวจได้ว่าคำนั้นขึ้นมาเพราะอะไร
+หรือ:
+
+```bash
+python scripts/search.py "พรำ" --index artifacts/v1 --top-k 20
+```
+
+ผลลัพธ์แต่ละคำมี:
+
+- score
+- relation hint
+- definition cosine
+- direct reference
+- shared tokens
+- word-form score
+- definition ที่รวมแล้ว
+- sense_count
+- source_ids
+
+จึงตรวจสอบได้ว่าคำนั้นขึ้นมาเพราะอะไร
 
 ## Google Colab
 
-V1 นี้เหมาะกับ Colab Free เพราะใช้ CPU และ sparse matrix
+V1 เหมาะกับ Colab Free เพราะใช้ CPU และ sparse matrix
 
-\`\`\`python
+### Cell 1 — clone branch
+
+```python
 !git clone -b feat/dictionary-semantic-v1 https://github.com/SealNM/thai_word.git
 %cd thai_word
-!pip install -r requirements.txt
-!python scripts/inspect_dictionary.py thai_word.json
-\`\`\`
+```
 
-เมื่อมี definition แล้วจึงรัน build และ search ต่อ
+### Cell 2 — dependencies
+
+```python
+!pip install -r requirements.txt
+```
+
+### Cell 3 — upload dictionary
+
+```python
+from google.colab import files
+uploaded = files.upload()
+```
+
+เลือกไฟล์พจนานุกรมที่มี `word_ID`, `headword_text`, `definition_text`
+
+### Cell 4 — inspect
+
+```python
+!python scripts/inspect_dictionary.py dictionary_test.json
+```
+
+### Cell 5 — build
+
+```python
+!python scripts/build_index.py dictionary_test.json --output artifacts/v1
+```
+
+### Cell 6 — search
+
+```python
+!python scripts/search.py "ฝน" --index artifacts/v1 --top-k 20
+```
 
 ## ทรัพยากรเป้าหมาย
 
-สำหรับ ~50,000 entries:
+สำหรับประมาณ 50,000 records:
 
 - CPU: 2–4 vCPU ก็เริ่มได้
 - RAM: 4–8 GB เป้าหมายเริ่มต้น
 - GPU: ไม่ใช้
-- index: sparse TF-IDF จึงควรอยู่ในระดับจัดการได้บน Colab Free
+- index: sparse TF-IDF
 
-ตัวเลขจริงจะวัดอีกครั้งหลังได้ความยาวและโครงสร้าง definition จริง
+ตัวเลขจริงจะวัดจากไฟล์เต็มหลัง build ครั้งแรก
