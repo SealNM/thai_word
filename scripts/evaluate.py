@@ -47,7 +47,18 @@ def main() -> None:
     parser.add_argument(
         "--output",
         default=None,
-        help="Optional path to save the JSON report.",
+        help="Optional path to save the full JSON report.",
+    )
+    parser.add_argument(
+        "--summary",
+        action="store_true",
+        help="Print a concise cross-query summary instead of the full JSON report.",
+    )
+    parser.add_argument(
+        "--summary-top",
+        type=int,
+        default=10,
+        help="Number of words to show per query in summary mode.",
     )
     args = parser.parse_args()
 
@@ -109,7 +120,34 @@ def main() -> None:
         )
 
     payload = json.dumps(report, ensure_ascii=False, indent=2)
-    print(payload)
+
+    if args.summary:
+        for item in report["queries"]:
+            query = item["query"]
+            selected = item.get("selected_sense")
+            selected_text = selected.get("definition") if selected else "(no dictionary sense)"
+            print(f"\n=== {query} [{item.get('category')}] ===")
+            print(f"sense: {selected_text}")
+            if item.get("error"):
+                print(f"ERROR: {item['error']}")
+                continue
+
+            compact = item["results"][: max(0, args.summary_top)]
+            if not compact:
+                print("(no results)")
+                continue
+
+            for rank, result in enumerate(compact, start=1):
+                tier = result.get("relation_tier")
+                hint = result.get("relation_hint")
+                form = result.get("lexical_form")
+                print(
+                    f"{rank:>2}. {result['word']} "
+                    f"score={result['score']:.6f} "
+                    f"tier={tier} {hint} {form}"
+                )
+    else:
+        print(payload)
 
     if args.output:
         out = Path(args.output)
