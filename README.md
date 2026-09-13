@@ -37,7 +37,8 @@ Built-in dense models:
 | key | model | หมายเหตุ |
 | --- | --- | --- |
 | `e5-small` | `intfloat/multilingual-e5-small` | baseline เบา, 384 dimensions, symmetric `query:` prefix |
-| `gte-base` | `Alibaba-NLP/gte-multilingual-base` | challenger, 768 dimensions, `trust_remote_code=True` |
+| `e5-base` | `intfloat/multilingual-e5-base` | stable challenger, 768 dimensions, standard XLM-R backbone |
+| `gte-base-experimental` | `Alibaba-NLP/gte-multilingual-base` | experimental only; uses custom remote code |
 
 E5 ใช้ `query:` ทั้ง query และ dictionary sense เพราะงานนี้เป็น semantic similarity / paraphrase-style retrieval มากกว่า asymmetric passage QA
 
@@ -97,16 +98,18 @@ if torch.cuda.is_available():
   --batch-size 64
 ```
 
-### 5) build GTE challenger
+### 5) build E5-base challenger
 
 ```python
 !python scripts/build_dense_index.py \
   --index artifacts/v1 \
-  --model gte-base \
-  --output artifacts/v2/gte-base \
+  --model e5-base \
+  --output artifacts/v2/e5-base \
   --device cuda \
   --batch-size 32
 ```
+
+`gte-base-experimental` ยังเก็บไว้สำหรับการทดลองแยก แต่ไม่อยู่ในเส้นทาง benchmark ปกติ เนื่องจากโมเดลพึ่ง custom Hugging Face remote code ซึ่งอาจไม่เข้ากันกับ PyTorch/Transformers รุ่นใหม่บน Colab
 
 ถ้า Colab session ไม่มี GPU จะเอา `--device cuda` ออกก็ได้ หรือคงไว้ได้เช่นกัน เพราะระบบจะตรวจ CUDA และ fallback ไป CPU โดยอัตโนมัติ
 
@@ -131,13 +134,13 @@ if torch.cuda.is_available():
   --device cuda
 ```
 
-### 7) benchmark V1 vs E5 vs GTE
+### 7) benchmark V1 vs E5-small vs E5-base
 
 ```python
 !python scripts/evaluate_v2.py \
   --index artifacts/v1 \
   --dense-index artifacts/v2/e5-small \
-  --dense-index artifacts/v2/gte-base \
+  --dense-index artifacts/v2/e5-base \
   --top-k 10 \
   --device cuda \
   --output evaluation/v2_report.json
@@ -156,7 +159,7 @@ artifacts/v2/e5-small/
 ├── dense_embeddings.npy
 └── dense_metadata.json
 
-artifacts/v2/gte-base/
+artifacts/v2/e5-base/
 ├── dense_embeddings.npy
 └── dense_metadata.json
 ```
@@ -441,7 +444,7 @@ python scripts/evaluate.py \
 - V1 RAM: 4–8 GB เป็นเป้าหมายเริ่มต้น
 - V2 dense build: GPU แนะนำแต่ไม่บังคับ
 - E5-small เบากว่าและเป็น baseline แรกสำหรับ Colab
-- GTE-base หนักกว่า จึงใช้ batch size เริ่มต้นต่ำกว่า
+- E5-base หนักกว่า E5-small จึงใช้ batch size เริ่มต้นต่ำกว่า
 - dense index ใช้ normalized float32 และยังไม่ต้องใช้ FAISS ใน V2 baseline
 - benchmark หลายโมเดลโหลดทีละโมเดลเพื่อลด peak RAM/VRAM
 - index รวม: sparse TF-IDF + lexical graph + dense sense embeddings
