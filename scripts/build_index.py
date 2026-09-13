@@ -8,15 +8,21 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from thai_lexical_v1 import build_index
+from thai_lexical_v1 import (
+    DEFAULT_DEFINITION_FIELD,
+    DEFAULT_ID_FIELD,
+    DEFAULT_WORD_FIELD,
+    build_index,
+)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build Thai dictionary semantic V1 artifacts.")
     parser.add_argument("input", help="Path to dictionary JSON.")
     parser.add_argument("--output", default="artifacts/v1", help="Artifact output directory.")
-    parser.add_argument("--word-field", default="headword_text")
-    parser.add_argument("--definition-field", default="definition")
+    parser.add_argument("--id-field", default=DEFAULT_ID_FIELD)
+    parser.add_argument("--word-field", default=DEFAULT_WORD_FIELD)
+    parser.add_argument("--definition-field", default=DEFAULT_DEFINITION_FIELD)
     parser.add_argument("--min-df", type=int, default=1)
     parser.add_argument("--max-features", type=int, default=None)
     args = parser.parse_args()
@@ -24,6 +30,7 @@ def main() -> None:
     metadata = build_index(
         args.input,
         args.output,
+        id_field=args.id_field,
         word_field=args.word_field,
         definition_field=args.definition_field,
         min_df=args.min_df,
