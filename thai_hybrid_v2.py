@@ -6,7 +6,7 @@ from typing import Any
 import numpy as np
 
 from thai_dense_v2 import DenseArtifacts, DenseEncoder, load_dense_artifacts, sense_text
-from thai_lexical_v1 import SearchArtifacts, search as lexical_search
+from thai_lexical_v1 import SearchArtifacts, normalize_text, search as lexical_search
 
 
 def weighted_rrf(
@@ -43,6 +43,7 @@ def _selected_query(
     query: str,
     sense: int | None,
 ) -> tuple[str, dict[str, Any] | None, int | None]:
+    query = normalize_text(query)
     entry_index = artifacts.word_to_index.get(query)
     if entry_index is None:
         if sense is not None:
