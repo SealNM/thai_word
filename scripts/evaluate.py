@@ -27,6 +27,7 @@ def _compact_result(item: dict[str, Any]) -> dict[str, Any]:
         "relation_tier": item.get("relation_tier"),
         "relation_hint": item.get("relation_hint"),
         "lexical_form": item.get("lexical_form"),
+        "sense_resolution": item.get("sense_resolution"),
         "definition": item.get("definition"),
         "matched_candidate_sense": item.get("matched_candidate_sense"),
         "signals": item.get("signals"),
@@ -128,6 +129,20 @@ def main() -> None:
             selected_text = selected.get("definition") if selected else "(no dictionary sense)"
             print(f"\n=== {query} [{item.get('category')}] ===")
             print(f"sense: {selected_text}")
+
+            senses = item.get("available_senses") or []
+            requested = item.get("requested_sense")
+            if len(senses) > 1 and requested is None:
+                print(
+                    f"WARNING: ambiguous headword ({len(senses)} raw dictionary senses); "
+                    "evaluation is currently defaulting to the first sense."
+                )
+                for sense_item in senses:
+                    definition = sense_item.get("definition", "")
+                    if len(definition) > 120:
+                        definition = definition[:117] + "..."
+                    print(f"  sense {sense_item['sense']}: {definition}")
+
             if item.get("error"):
                 print(f"ERROR: {item['error']}")
                 continue
@@ -141,10 +156,16 @@ def main() -> None:
                 tier = result.get("relation_tier")
                 hint = result.get("relation_hint")
                 form = result.get("lexical_form")
+                resolution = result.get("sense_resolution")
+                resolution_text = (
+                    " sense=?"
+                    if resolution == "headword_reference_ambiguous"
+                    else ""
+                )
                 print(
                     f"{rank:>2}. {result['word']} "
                     f"score={result['score']:.6f} "
-                    f"tier={tier} {hint} {form}"
+                    f"tier={tier} {hint} {form}{resolution_text}"
                 )
     else:
         print(payload)
