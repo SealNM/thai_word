@@ -8,6 +8,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 
 from thai_lexical_v1 import (
     SearchArtifacts,
+    _forward_reference_strength,
     _hierarchical_score,
     _reference_strength,
     _relation_tier,
@@ -170,6 +171,34 @@ class SenseAwareSearchTests(unittest.TestCase):
         )
         self.assertEqual(standalone, 5)
         self.assertEqual(bound, 4)
+
+    def test_forward_gloss_parser_separates_gloss_example_and_negation(self) -> None:
+        definition = "ไว เช่น กินเร็ว หายเร็ว ๆ, รีบ เช่น เร็วเข้า, ด่วน, ไม่ชักช้า"
+        self.assertGreaterEqual(_forward_reference_strength(definition, "ไว"), 0.9)
+        self.assertGreaterEqual(_forward_reference_strength(definition, "รีบ"), 0.9)
+        self.assertGreaterEqual(_forward_reference_strength(definition, "ด่วน"), 0.9)
+        self.assertLess(_forward_reference_strength(definition, "กิน"), 0.2)
+        self.assertLess(_forward_reference_strength(definition, "หาย"), 0.2)
+        self.assertEqual(_forward_reference_strength(definition, "ชักช้า"), 0.0)
+
+    def test_forward_alias_is_strong_but_definition_components_are_not(self) -> None:
+        definition = "เปล่งเสียงออกเป็นถ้อยคำ, พูดจา ก็ว่า."
+        self.assertGreaterEqual(_forward_reference_strength(definition, "พูดจา"), 0.9)
+        self.assertLess(_forward_reference_strength(definition, "เสียง"), 0.6)
+        self.assertLess(_forward_reference_strength(definition, "ถ้อยคำ"), 0.6)
+
+    def test_explicit_sense_demotes_unresolved_bare_headword_reference(self) -> None:
+        results = search(
+            self.artifacts,
+            "ฝน",
+            top_k=3,
+            candidate_pool=4,
+            sense=2,
+        )
+        pirun = next(item for item in results if item["word"] == "พิรุณ")
+        self.assertEqual(pirun["sense_resolution"], "headword_reference_ambiguous")
+        self.assertEqual(pirun["relation_hint"], "ambiguous_headword_reference")
+        self.assertLessEqual(pirun["relation_tier"], 2)
 
 
 if __name__ == "__main__":
