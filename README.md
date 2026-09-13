@@ -261,7 +261,14 @@ python scripts/evaluate.py \
 - จำนวนผลลัพธ์แยกตาม relation tier
 - top results พร้อม definition, relation hint, lexical form และ signals
 
-สำหรับ query ที่ `sense: null` ให้ตรวจ `selected_sense` ก่อนตัดสินคุณภาพผลลัพธ์ หาก sense 1 ของพจนานุกรมไม่ใช่ความหมายที่ต้องการ ให้ใส่หมายเลข sense ที่เหมาะสมลงใน `evaluation/v1_queries.json` แล้วรันใหม่
+สำหรับ query ที่ `sense: null` และมีหลาย raw senses โหมด `--summary` จะแสดงคำเตือนพร้อมรายการ sense ทั้งหมดก่อน ไม่ควรตัดสินคุณภาพ ranking จาก sense แรกโดยอัตโนมัติ ให้กำหนดหมายเลข sense ที่ตรงกับความหมายเป้าหมายใน `evaluation/v1_queries.json` แล้วรันใหม่
+
+เมื่อระบุ `--sense N` หรือ `sense: N` ระบบถือว่าเป็น **strict sense search**:
+- direct gloss ที่ระบุเพียง headword เช่น `รัก.` แต่ไม่มีหลักฐานใน definition ว่าชี้ไปยัง sense ใด จะยังแสดงได้ แต่ติด `sense_resolution: headword_reference_ambiguous`
+- reference แบบนี้จะถูกลด tier เพื่อไม่ให้ข้ามมาครองผลลัพธ์ของ homonym ที่ผิดความหมาย
+- ถ้า candidate entry มี definition อื่นที่สนับสนุน sense ที่เลือก ระบบใช้ `entry_semantic_cosine` เป็นหลักฐานประกอบได้
+
+นอกจากนี้ forward reference จากนิยาม query แยก gloss ออกจากตัวอย่างแล้ว เช่น `ไว เช่น กินเร็ว` จะให้น้ำหนัก `ไว` สูง แต่ `กิน` ต่ำ และ `ไม่ชักช้า` จะไม่ถูกนับเป็นคำพ้องของ `เร็ว`
 
 เป้าหมายของรอบนี้คือดูว่า ranking architecture ใช้ได้ทั่วไป ไม่ใช่บังคับให้ทุก query มีคำตอบตามรายการที่เขียนไว้ล่วงหน้า
 
