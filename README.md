@@ -29,7 +29,7 @@ query + selected sense
 - direct lexical relations Tier 4–5 แบบ standalone ถูกปกป้องไว้เหนือ dense-only candidates
 - Tier 0–1 ไม่ได้ lexical-rank bonus ใน fusion เพื่อเปิดทางให้ dense semantic ช่วยแก้กรณีเช่น `พูด → เอ่ย`
 - Tier 2 ได้ lexical weight 0.25, Tier 3 ได้ 0.5, Tier 4–5 ได้ 1.0
-- ใช้ RRF เพื่อไม่ต้องเอา cosine ของ E5 กับ GTE ซึ่งมีสเกลต่างกันมาบวกตรง ๆ
+- ใช้ RRF เพื่อไม่ต้องเอา cosine ของ dense models ต่างรุ่นซึ่งอาจมีสเกลต่างกันมาบวกตรง ๆ
 - V1 artifacts ไม่ต้อง rebuild เมื่อเปลี่ยน dense model
 
 Built-in dense models:
