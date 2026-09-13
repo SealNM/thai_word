@@ -22,7 +22,13 @@ MODEL_PROFILES: dict[str, dict[str, Any]] = {
         "query_prefix": "query: ",
         "document_prefix": "query: ",
     },
-    "gte-base": {
+    "e5-base": {
+        "model_id": "intfloat/multilingual-e5-base",
+        "trust_remote_code": False,
+        "query_prefix": "query: ",
+        "document_prefix": "query: ",
+    },
+    "gte-base-experimental": {
         "model_id": "Alibaba-NLP/gte-multilingual-base",
         "trust_remote_code": True,
         "query_prefix": "",
