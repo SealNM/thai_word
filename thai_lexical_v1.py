@@ -18,6 +18,9 @@ from sklearn.metrics.pairwise import linear_kernel
 
 
 ARTIFACT_VERSION = 1
+DEFAULT_ID_FIELD = "word_ID"
+DEFAULT_WORD_FIELD = "headword_text"
+DEFAULT_DEFINITION_FIELD = "definition_text"
 ZERO_WIDTH_RE = re.compile(r"[\u200b\u200c\u200d\ufeff]")
 SPACE_RE = re.compile(r"\s+")
 
@@ -59,13 +62,15 @@ def load_json_records(path: str | Path) -> list[dict[str, Any]]:
 
 def inspect_records(
     records: list[dict[str, Any]],
-    word_field: str = "headword_text",
-    definition_field: str = "definition",
+    id_field: str = DEFAULT_ID_FIELD,
+    word_field: str = DEFAULT_WORD_FIELD,
+    definition_field: str = DEFAULT_DEFINITION_FIELD,
 ) -> dict[str, Any]:
     key_counts: Counter[str] = Counter()
     for row in records:
         key_counts.update(row.keys())
 
+    ids = [row.get(id_field) for row in records if row.get(id_field) is not None]
     words = [normalize_text(row.get(word_field, "")) for row in records]
     words = [word for word in words if word]
     definitions = [flatten_definition(row.get(definition_field)) for row in records]
@@ -80,6 +85,9 @@ def inspect_records(
     return {
         "records": len(records),
         "fields": dict(key_counts),
+        "id_field": id_field,
+        "id_field_records": len(ids),
+        "unique_ids": len(set(map(str, ids))),
         "word_field": word_field,
         "word_field_records": len(words),
         "unique_words": len(set(words)),
@@ -130,6 +138,7 @@ def _thai_tokenizer(headwords: Iterable[str]):
 
 def prepare_entries(
     records: list[dict[str, Any]],
+    id_field: str,
     word_field: str,
     definition_field: str,
 ) -> list[dict[str, Any]]:
@@ -149,16 +158,19 @@ def prepare_entries(
         definition = flatten_definition(row.get(definition_field))
         if not word or not definition:
             continue
+
+        source_id = row.get(id_field)
         if word not in merged:
             merged[word] = {
                 "word": word,
                 "definitions": [definition],
-                "source_ids": [row.get("headword_ID")],
+                "source_ids": [source_id] if source_id is not None else [],
             }
         else:
             if definition not in merged[word]["definitions"]:
                 merged[word]["definitions"].append(definition)
-            merged[word]["source_ids"].append(row.get("headword_ID"))
+            if source_id is not None and source_id not in merged[word]["source_ids"]:
+                merged[word]["source_ids"].append(source_id)
 
     if not merged:
         raise DictionarySchemaError(
@@ -171,7 +183,9 @@ def prepare_entries(
             {
                 "word": item["word"],
                 "definition": normalize_text(" ".join(item["definitions"])),
-                "source_ids": [value for value in item["source_ids"] if value is not None],
+                "definitions": item["definitions"],
+                "source_ids": item["source_ids"],
+                "sense_count": len(item["definitions"]),
             }
         )
     entries.sort(key=lambda row: row["word"])
@@ -182,13 +196,14 @@ def build_index(
     input_path: str | Path,
     output_dir: str | Path,
     *,
-    word_field: str = "headword_text",
-    definition_field: str = "definition",
+    id_field: str = DEFAULT_ID_FIELD,
+    word_field: str = DEFAULT_WORD_FIELD,
+    definition_field: str = DEFAULT_DEFINITION_FIELD,
     min_df: int = 1,
     max_features: int | None = None,
 ) -> dict[str, Any]:
     records = load_json_records(input_path)
-    entries = prepare_entries(records, word_field, definition_field)
+    entries = prepare_entries(records, id_field, word_field, definition_field)
     words = [row["word"] for row in entries]
     tokenize = _thai_tokenizer(words)
 
@@ -243,10 +258,12 @@ def build_index(
         "artifact_version": ARTIFACT_VERSION,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "input_path": str(input_path),
+        "id_field": id_field,
         "word_field": word_field,
         "definition_field": definition_field,
         "records_input": len(records),
         "entries_indexed": len(entries),
+        "senses_indexed": sum(row["sense_count"] for row in entries),
         "features": int(matrix.shape[1]),
         "matrix_shape": [int(matrix.shape[0]), int(matrix.shape[1])],
         "matrix_nnz": int(matrix.nnz),
@@ -377,6 +394,8 @@ def search(
                     "word_form": round(float(word_form), 6),
                 },
                 "definition": candidate["definition"],
+                "sense_count": candidate.get("sense_count", 1),
+                "source_ids": candidate.get("source_ids", []),
             }
         )
 
