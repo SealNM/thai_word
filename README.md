@@ -102,6 +102,7 @@ cuda available: True
 ### Step 4 — รัน unit tests ก่อน build
 
 ```python
+%cd /content/thai_word
 !python -m unittest discover -s tests
 ```
 
@@ -110,6 +111,7 @@ cuda available: True
 ### Step 5 — ตรวจพจนานุกรม
 
 ```python
+%cd /content/thai_word
 !python scripts/inspect_dictionary.py
 ```
 
@@ -120,6 +122,7 @@ cuda available: True
 รอบเริ่มใหม่ให้ลบ artifact เดิมทั้งหมดก่อน:
 
 ```python
+%cd /content/thai_word
 !rm -rf artifacts/v1
 !python scripts/build_index.py --output artifacts/v1
 ```
@@ -136,6 +139,7 @@ cuda available: True
 ### Step 7 — ล้าง V2 artifacts เก่า
 
 ```python
+%cd /content/thai_word
 !rm -rf artifacts/v2
 !mkdir -p artifacts/v2
 ```
@@ -145,6 +149,7 @@ cuda available: True
 ถ้า GPU พร้อม:
 
 ```python
+%cd /content/thai_word
 !python scripts/build_dense_index.py \
   --index artifacts/v1 \
   --model e5-small \
@@ -156,6 +161,7 @@ cuda available: True
 ถ้าใช้ CPU:
 
 ```python
+%cd /content/thai_word
 !python scripts/build_dense_index.py \
   --index artifacts/v1 \
   --model e5-small \
@@ -180,6 +186,7 @@ artifacts/v2/e5-small/dense_metadata.json
 ### Step 9 — ทดสอบ hybrid search ด้วย E5-small
 
 ```python
+%cd /content/thai_word
 !python scripts/search_v2.py "พูด" \
   --index artifacts/v1 \
   --dense-index artifacts/v2/e5-small \
@@ -207,6 +214,7 @@ E5-base เป็น challenger หลักของ V2 และใช้ 768 
 GPU:
 
 ```python
+%cd /content/thai_word
 !python scripts/build_dense_index.py \
   --index artifacts/v1 \
   --model e5-base \
@@ -218,6 +226,7 @@ GPU:
 CPU:
 
 ```python
+%cd /content/thai_word
 !python scripts/build_dense_index.py \
   --index artifacts/v1 \
   --model e5-base \
@@ -231,6 +240,7 @@ CPU:
 GPU:
 
 ```python
+%cd /content/thai_word
 !python scripts/evaluate_v2.py \
   --index artifacts/v1 \
   --dense-index artifacts/v2/e5-small \
@@ -243,6 +253,7 @@ GPU:
 CPU:
 
 ```python
+%cd /content/thai_word
 !python scripts/evaluate_v2.py \
   --index artifacts/v1 \
   --dense-index artifacts/v2/e5-small \
