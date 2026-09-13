@@ -232,7 +232,13 @@ test นี้ไม่ต้องโหลดพจนานุกรมเต
 evaluation/v1_queries.json
 ```
 
-รันได้ด้วย:
+รันแบบสรุปก่อนเพื่อดูครบทุก query โดยไม่ให้ output ยาวเกินไป:
+
+```bash
+python scripts/evaluate.py --index artifacts/v1 --top-k 10 --summary
+```
+
+ถ้าต้องการ full JSON ให้รันโดยไม่ใส่ `--summary`:
 
 ```bash
 python scripts/evaluate.py --index artifacts/v1 --top-k 10
