@@ -18,7 +18,7 @@ MODEL_PROFILES: dict[str, dict[str, Any]] = {
         "model_id": "intfloat/multilingual-e5-small",
         "trust_remote_code": False,
         "query_prefix": "query: ",
-        "document_prefix": "passage: ",
+        "document_prefix": "query: ",
     },
     "gte-base": {
         "model_id": "Alibaba-NLP/gte-multilingual-base",
