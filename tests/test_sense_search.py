@@ -6,7 +6,14 @@ import numpy as np
 from scipy import sparse
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-from thai_lexical_v1 import SearchArtifacts, _reference_strength, search, split_tokens
+from thai_lexical_v1 import (
+    SearchArtifacts,
+    _hierarchical_score,
+    _reference_strength,
+    _relation_tier,
+    search,
+    split_tokens,
+)
 
 
 class SenseAwareSearchTests(unittest.TestCase):
@@ -28,8 +35,8 @@ class SenseAwareSearchTests(unittest.TestCase):
             },
             {
                 "word": "พิรุณ",
-                "definition": "ฝน น้ำตกจากเมฆ",
-                "definitions": ["ฝน น้ำตกจากเมฆ"],
+                "definition": "ฝน",
+                "definitions": ["ฝน"],
                 "source_ids": [4],
                 "sense_count": 1,
             },
@@ -45,14 +52,14 @@ class SenseAwareSearchTests(unittest.TestCase):
             {"entry_index": 0, "sense_index": 1, "definition": "ปี รอบปี"},
             {"entry_index": 1, "sense_index": 1, "definition": "น้ำตกจากเมฆ"},
             {"entry_index": 1, "sense_index": 2, "definition": "ลับมีด"},
-            {"entry_index": 2, "sense_index": 1, "definition": "ฝน น้ำตกจากเมฆ"},
+            {"entry_index": 2, "sense_index": 1, "definition": "ฝน"},
             {"entry_index": 3, "sense_index": 1, "definition": "ทำให้คมด้วยการฝน"},
         ]
         tokenized = [
             "ปี รอบปี",
             "น้ำตก เมฆ",
             "ลับ มีด",
-            "ฝน น้ำตก เมฆ",
+            "ฝน",
             "ทำ คม ฝน",
         ]
         vectorizer = TfidfVectorizer(
@@ -77,7 +84,7 @@ class SenseAwareSearchTests(unittest.TestCase):
                 {"ปี", "รอบปี"},
                 {"น้ำตก", "เมฆ"},
                 {"ลับ", "มีด"},
-                {"ฝน", "น้ำตก", "เมฆ"},
+                {"ฝน"},
                 {"ทำ", "คม", "ฝน"},
             ],
             entry_to_senses=[[0], [1, 2], [3], [4]],
@@ -120,7 +127,49 @@ class SenseAwareSearchTests(unittest.TestCase):
         results = search(self.artifacts, "ฝน", top_k=3, candidate_pool=4)
         pirun = next(item for item in results if item["word"] == "พิรุณ")
         self.assertEqual(pirun["relation_hint"], "direct_gloss_or_synonym")
-        self.assertGreaterEqual(pirun["signals"]["reverse_reference"], 0.9)
+        self.assertEqual(pirun["relation_tier"], 5)
+        self.assertGreaterEqual(pirun["signals"]["reverse_reference"], 0.999)
+
+    def test_relation_tier_prevents_similarity_from_beating_direct_gloss(self) -> None:
+        pure_tier = _relation_tier(
+            reverse_strength=1.0,
+            forward_strength=0.0,
+            candidate_word="พิรุณ",
+        )
+        alternative_tier = _relation_tier(
+            reverse_strength=0.95,
+            forward_strength=0.0,
+            candidate_word="พลาหก",
+        )
+        pure_score = _hierarchical_score(
+            pure_tier,
+            cosine=0.0,
+            shared=0.0,
+            word_form=0.0,
+            exact_headword_query=True,
+        )
+        alternative_score = _hierarchical_score(
+            alternative_tier,
+            cosine=1.0,
+            shared=1.0,
+            word_form=1.0,
+            exact_headword_query=True,
+        )
+        self.assertGreater(pure_score, alternative_score)
+
+    def test_bound_form_is_demoted_one_relation_tier(self) -> None:
+        standalone = _relation_tier(
+            reverse_strength=1.0,
+            forward_strength=0.0,
+            candidate_word="พรรษ",
+        )
+        bound = _relation_tier(
+            reverse_strength=1.0,
+            forward_strength=0.0,
+            candidate_word="พรรษ-",
+        )
+        self.assertEqual(standalone, 5)
+        self.assertEqual(bound, 4)
 
 
 if __name__ == "__main__":
