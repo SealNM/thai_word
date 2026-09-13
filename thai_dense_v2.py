@@ -44,6 +44,14 @@ class DenseArtifacts:
 
 
 def resolve_model_profile(model: str) -> dict[str, Any]:
+    if model == "gte-base":
+        raise ValueError(
+            "The 'gte-base' profile was removed from the default V2 benchmark because "
+            "Alibaba-NLP/gte-multilingual-base depends on custom remote modeling code "
+            "that is not stable across current Colab PyTorch/Transformers stacks. "
+            "Use '--model e5-base' for the stable 768-dimensional challenger, or "
+            "'--model gte-base-experimental' if you intentionally want to test GTE."
+        )
     if model in MODEL_PROFILES:
         profile = dict(MODEL_PROFILES[model])
         profile["key"] = model
