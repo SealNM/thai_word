@@ -25,6 +25,19 @@ def weighted_rrf(
     return score
 
 
+def lexical_relation_weight(relation_tier: int) -> float:
+    """Scale lexical rank evidence by relation quality before RRF fusion."""
+    if relation_tier >= 4:
+        return 1.0
+    if relation_tier == 3:
+        return 0.5
+    if relation_tier == 2:
+        return 0.25
+    # Tier 0-1 is weak/component evidence. Let dense semantics decide ordering
+    # instead of rewarding a candidate merely for appearing in the lexical pool.
+    return 0.0
+
+
 def _selected_query(
     artifacts: SearchArtifacts,
     query: str,
@@ -195,10 +208,11 @@ class HybridSearcher:
                 if relation_tier >= 4 and lexical_form == "standalone"
                 else 0
             )
+            relation_weight = lexical_relation_weight(relation_tier)
             fusion_score = weighted_rrf(
                 lexical_rank=lexical_rank.get(entry_index),
                 dense_rank=dense_rank.get(entry_index),
-                lexical_weight=lexical_weight,
+                lexical_weight=lexical_weight * relation_weight,
                 dense_weight=dense_weight,
                 k=rrf_k,
             )
@@ -214,6 +228,10 @@ class HybridSearcher:
                     "sense_resolution": sense_resolution,
                     "lexical_score": round(lexical_score, 6),
                     "lexical_rank": lexical_rank.get(entry_index),
+                    "lexical_fusion_weight": round(
+                        lexical_weight * relation_weight,
+                        6,
+                    ),
                     "dense_similarity": (
                         round(float(dense_similarity), 6)
                         if dense_similarity is not None
