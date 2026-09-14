@@ -1,6 +1,6 @@
 # V4 — V2.5 Candidate Retrieval + Instruction-Aware Reranking
 
-Status: **V4 pilot complete; V4.1 commonness experiment implemented, real-model rerun pending**
+Status: **V4.1 pilot complete; V4.2 semantic-gated commonness implemented, real-model rerun pending**
 
 Branch: `feat/dictionary-semantic-v4-instruction-reranker`
 
@@ -263,9 +263,9 @@ Implementation:
 - [x] Add evaluator weight sweep so 0.25 / 0.5 / 0.75 / 1.0 commonness weights reuse the same reranker inference.
 - [x] Change V4.1 CLI defaults to strict prompt + commonness mode.
 - [x] Add unit coverage for the new prompt and commonness fusion logic.
-- [ ] Run the 10-query real-model V4.1 rerun in Colab.
-- [ ] Inspect `บ้าน` especially for เรือน / บ้านเรือน / บ้านช่อง / บ้านช่องห้องหอ vs เวศม์ / วาสะ / อธิวาส.
-- [ ] Inspect semantic-safety regressions on เดิน / ฝน / รัก / มืด.
+- [x] Run the 10-query real-model V4.1 rerun in Colab.
+- [x] Inspect `บ้าน` especially for เรือน / บ้านเรือน / บ้านช่อง / บ้านช่องห้องหอ vs เวศม์ / วาสะ / อธิวาส.
+- [x] Inspect semantic-safety regressions on เดิน / ฝน / รัก / มืด.
 - [ ] Choose a commonness weight only after human inspection.
 
 ### Commonness data decision
@@ -299,3 +299,69 @@ python scripts/evaluate_v4.py \
 ```
 
 The four commonness variants use the same Qwen scores; the model is not rerun four times.
+
+
+## V4.1 real-model finding — commonness cannot create relevance
+
+The TNC weight sweep confirmed that frequency/commonness is useful only after semantic quality is established.
+
+Observed:
+- Low commonness weight improved some ordering, especially `พูด`, `เร็ว`, `โกรธ`, and parts of `บ้าน`.
+- Higher weights caused frequent but semantically wrong candidates to jump upward:
+  - `ฝน -> ตก / รั่ว / เมฆ`
+  - `เดิน -> วิ่ง / ย้าย / ถอย`
+  - `สวย -> ดี`
+  - `มืด -> เงา / ดึก / ดำ`
+  - `รัก -> พระ / ลูก`
+  - `บ้าน -> ที่ / อยู่ / ปลูก`
+- Therefore raw frequency must not be fused as an unrestricted relevance signal.
+
+Decision:
+1. Keep TNC as a commonness/familiarity source.
+2. Stop unrestricted commonness RRF from being the preferred V4 path.
+3. Gate commonness behind semantic evidence.
+4. Cap how far commonness is allowed to promote a candidate.
+5. Make commonness token-aware so natural compounds such as `บ้านเรือน` are not treated as rare solely because the exact phrase has a lower corpus count.
+
+## V4.2 — Semantic-gated commonness + token-aware familiarity
+
+Implemented:
+- [x] Add `gated-commonness` ranking mode.
+- [x] Commonness can promote only candidates that pass semantic evidence from either:
+  - strong standalone lexical relation, or
+  - agreement between V2.5 rank and strict reranker rank.
+- [x] Commonness no longer creates arbitrary score gains across the whole candidate pool.
+- [x] Promotion is capped by rank movement (default maximum: 4 positions).
+- [x] Add token-aware familiarity using PyThaiNLP `newmm`.
+- [x] Exact TNC phrase frequency remains strongest evidence.
+- [x] For multi-token words/compounds, component familiarity contributes when the exact phrase is rare or absent.
+- [x] Preserve the old unrestricted `commonness` mode only for comparison.
+- [x] Add `qwen3-0.6b-v4.2` profile; it keeps the strict V4.1 substitutability instruction.
+- [x] Update the evaluator to compare rerank / fusion / gated-commonness while reusing one Qwen inference.
+- [x] Sweep gated-commonness strength at 0.5 and 1.0 by default.
+- [x] Add tests for token-aware compound familiarity, semantic-gate eligibility, capped promotion, and zero-weight equivalence to fusion.
+- [ ] Run the 10-query V4.2 pilot in Colab.
+- [ ] Inspect whether frequent unrelated words stop jumping into the top 10.
+- [ ] Inspect whether `บ้านเรือน / เรือน / บ้านช่อง` gain moderately without allowing `ที่ / อยู่ / ปลูก` to dominate.
+- [ ] Inspect whether literary alternatives remain available lower in the list.
+
+### Recommended V4.2 pilot
+
+```bash
+python scripts/evaluate_v4.py \
+  --dense-index artifacts/v2/embeddinggemma-300m-256 \
+  --reranker qwen3-0.6b-v4.2 \
+  --candidate-pool 50 \
+  --top-k 10 \
+  --device cuda \
+  --mode rerank \
+  --mode fusion \
+  --mode gated-commonness \
+  --commonness-source tnc \
+  --commonness-weight 0.5 \
+  --commonness-weight 1.0 \
+  --commonness-promotion-cap 4 \
+  --output artifacts/v4/qwen3-0.6b-v4.2-pilot.json
+```
+
+Both gated-commonness variants reuse the same reranker scores; Qwen is not run twice.
