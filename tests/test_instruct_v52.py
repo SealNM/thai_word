@@ -73,7 +73,7 @@ class V52InstructionRerankerTests(unittest.TestCase):
             candidates,
             mode="fusion",
             top_k=3,
-            v25_weight=0.2,
+            v25_weight=0.1,
             instruct_weight=1.0,
             rrf_k=20,
         )
