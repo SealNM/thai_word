@@ -40,7 +40,8 @@ def main() -> None:
     parser.add_argument("--dense-device", default=None)
     parser.add_argument("--ranker-device", default=None)
     parser.add_argument("--qwen-dtype", default=None)
-    parser.add_argument("--qwen-max-new-tokens", type=int, default=384)
+    parser.add_argument("--qwen-max-new-tokens", type=int, default=192)
+    parser.add_argument("--qwen-output-count", type=int, default=15)
     parser.add_argument("--v25-rank-weight", type=float, default=0.2)
     parser.add_argument("--listwise-rank-weight", type=float, default=1.0)
     parser.add_argument("--v5-rrf-k", type=int, default=20)
@@ -69,6 +70,7 @@ def main() -> None:
         device=ranker_device,
         qwen_dtype=args.qwen_dtype,
         qwen_max_new_tokens=args.qwen_max_new_tokens,
+        qwen_output_count=args.qwen_output_count,
     )
     _status(
         f"[2/3] {resolved_name} ready in {perf_counter() - started:.1f}s"
