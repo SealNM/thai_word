@@ -215,8 +215,17 @@ def build_dense_index(
     model: str = "e5-small",
     batch_size: int = 64,
     device: str | None = None,
+    profile_overrides: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     profile = resolve_model_profile(model)
+    if profile_overrides:
+        profile.update(
+            {
+                key: value
+                for key, value in profile_overrides.items()
+                if value is not None
+            }
+        )
     load_started = perf_counter()
     encoder = load_model(profile, device=device)
     load_seconds = perf_counter() - load_started
