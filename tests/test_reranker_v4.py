@@ -4,11 +4,13 @@ import unittest
 from typing import Any
 
 from thai_reranker_v4 import (
+    annotate_commonness,
     annotate_reranker_scores,
     build_candidate_document,
     build_writer_query,
     is_high_precision_lexical,
     rank_v4_candidates,
+    resolve_reranker_profile,
 )
 
 
@@ -85,6 +87,13 @@ class V4RerankerTests(unittest.TestCase):
         self.assertIn("Thai candidate word: พิรุณ", text)
         self.assertIn("Dictionary meaning: ฝน", text)
 
+    def test_v41_profile_prefers_common_substitutes(self) -> None:
+        profile = resolve_reranker_profile("qwen3-0.6b-v4.1")
+        instruction = str(profile["instruction"])
+        self.assertIn("lexical substitutability", instruction)
+        self.assertIn("commonly used Thai words", instruction)
+        self.assertIn("grammatical role", instruction)
+
     def test_only_narrow_tier_five_evidence_is_protected(self) -> None:
         self.assertTrue(is_high_precision_lexical(self.candidates[0]))
 
@@ -130,6 +139,48 @@ class V4RerankerTests(unittest.TestCase):
         self.assertEqual(results[0]["v4_mode"], "fusion")
         self.assertIn("v25_score", results[0])
         self.assertIn("reranker_score", results[0])
+
+    def test_commonness_rank_uses_frequency_but_missing_words_get_no_boost(self) -> None:
+        scorer = _FakeScorer([0.8, 0.79, 0.78])
+        scored = annotate_reranker_scores("ฝน", self.candidates, scorer)
+        scored = annotate_commonness(
+            scored,
+            {"พลาหก": 2, "เมฆ": 1000},
+            source="fake",
+        )
+
+        by_word = {item["word"]: item for item in scored}
+        self.assertEqual(by_word["เมฆ"]["commonness_rank"], 1)
+        self.assertEqual(by_word["พลาหก"]["commonness_rank"], 2)
+        self.assertIsNone(by_word["พิรุณ"]["commonness_rank"])
+
+        results = rank_v4_candidates(
+            scored,
+            mode="commonness",
+            top_k=3,
+            v25_weight=0.0,
+            reranker_weight=1.0,
+            commonness_weight=1.0,
+            rrf_k=20,
+        )
+        self.assertEqual(results[0]["word"], "เมฆ")
+
+    def test_zero_commonness_weight_matches_fusion_order(self) -> None:
+        scorer = _FakeScorer([0.4, 0.9, 0.8])
+        scored = annotate_reranker_scores("ฝน", self.candidates, scorer)
+        scored = annotate_commonness(scored, {"พิรุณ": 999, "เมฆ": 1})
+
+        fusion = rank_v4_candidates(scored, mode="fusion", top_k=3)
+        common = rank_v4_candidates(
+            scored,
+            mode="commonness",
+            top_k=3,
+            commonness_weight=0.0,
+        )
+        self.assertEqual(
+            [item["word"] for item in common],
+            [item["word"] for item in fusion],
+        )
 
     def test_mismatched_score_count_fails_closed(self) -> None:
         scorer = _FakeScorer([0.5])
