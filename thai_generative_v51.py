@@ -25,11 +25,17 @@ Priority order:
 6. Penalize associated-only words, cause/effect relations, objects/agents, compounds
    with a different lexical role, and manner/subtype changes that alter the meaning.
 
-Return exactly one JSON array of the requested best candidate integer IDs, ordered\nfrom best to worst. Return no prose, no markdown, and no explanation.
+Return exactly one JSON array of the requested best candidate integer IDs, ordered
+from best to worst. Return no prose, no markdown, and no explanation.
 """
 
 
-def build_generative_listwise_prompt(\n    query_text: str,\n    documents: list[str],\n    *,\n    output_count: int = 15,\n) -> str:
+def build_generative_listwise_prompt(
+    query_text: str,
+    documents: list[str],
+    *,
+    output_count: int = 15,
+) -> str:
     lines = [
         QWEN35_RANKING_POLICY.strip(),
         "",
@@ -41,7 +47,16 @@ def build_generative_listwise_prompt(\n    query_text: str,\n    documents: list
     for index, document in enumerate(documents):
         lines.append(f"[{index}] {document.strip()}")
 
-    requested = min(max(1, int(output_count)), len(documents))\n    lines.extend(\n        [\n            "",\n            f"There are exactly {len(documents)} candidates with IDs 0 through "\n            f"{max(0, len(documents) - 1)}.",\n            f"Return exactly the best {requested} candidate IDs only.",\n            "Output only the JSON array now.",\n        ]\n    )
+    requested = min(max(1, int(output_count)), len(documents))
+    lines.extend(
+        [
+            "",
+            f"There are exactly {len(documents)} candidates with IDs 0 through "
+            f"{max(0, len(documents) - 1)}.",
+            f"Return exactly the best {requested} candidate IDs only.",
+            "Output only the JSON array now.",
+        ]
+    )
     return "\n".join(lines)
 
 
@@ -77,9 +92,8 @@ def parse_ranked_candidate_ids(
     best: list[int] = []
     strategy = "none"
 
-    # Prefer the largest valid JSON array in the output instead of the first
-    # bracket pair. Small models sometimes emit singleton labels such as [0]
-    # before a fuller answer.
+    # Prefer the largest valid JSON array in the generated output instead of
+    # blindly taking the first bracket pair.
     for match in re.finditer(r"\[[^\[\]]*\]", text):
         chunk = match.group(0)
         try:
@@ -93,8 +107,7 @@ def parse_ranked_candidate_ids(
             best = candidate_ids
             strategy = "json"
 
-    # If the model emitted ranked singleton labels such as [7] [3] [12],
-    # recover their order across the whole generated answer.
+    # Small models sometimes emit singleton labels like [7] [3] [12].
     if len(best) < target_count:
         singleton_ids = _unique_valid_ids(
             re.findall(r"\[(\d+)\]", text),
@@ -104,10 +117,13 @@ def parse_ranked_candidate_ids(
             best = singleton_ids
             strategy = "bracket-ids"
 
-    # Final recovery: generated output contains only the answer, so numeric IDs
-    # are safe to collect in appearance order. Keep this visibly marked.
+    # Last recovery path: collect candidate integers in appearance order from
+    # generated output only. This is intentionally marked as recovery.
     if len(best) < target_count:
-        numeric_ids = _unique_valid_ids(re.findall(r"\d+", text), candidate_count)
+        numeric_ids = _unique_valid_ids(
+            re.findall(r"\d+", text),
+            candidate_count,
+        )
         if len(numeric_ids) > len(best):
             best = numeric_ids
             strategy = "numeric-recovery"
@@ -116,8 +132,8 @@ def parse_ranked_candidate_ids(
     selected = best[:target_count]
     complete = explicit_count >= target_count
 
-    # The shared V5 ranking interface expects a full ordering. Candidates not
-    # explicitly ranked by the generative model keep their original V2.5 order.
+    # V5's shared ranker interface expects a full permutation. IDs not
+    # explicitly ranked by Qwen fall back to the original V2.5 order.
     missing = [index for index in range(candidate_count) if index not in selected]
     full_order = selected + missing
 
@@ -131,7 +147,9 @@ class Qwen35GenerativeListwiseRanker:
         *,
         device: str | None = None,
         dtype: str | None = None,
-        max_new_tokens: int = 192,\n        output_count: int = 15,\n    ) -> None:
+        max_new_tokens: int = 192,
+        output_count: int = 15,
+    ) -> None:
         try:
             import torch
             from transformers import AutoModelForMultimodalLM, AutoProcessor
@@ -142,10 +160,13 @@ class Qwen35GenerativeListwiseRanker:
             ) from exc
 
         self.model_id = model_id
-        self.max_new_tokens = max(64, int(max_new_tokens))\n        self.output_count = max(1, int(output_count))\n        self.last_output = ""
+        self.max_new_tokens = max(64, int(max_new_tokens))
+        self.output_count = max(1, int(output_count))
+        self.last_output = ""
         self.last_parse_complete = False
         self.last_parse_strategy = "none"
-        self.last_parsed_count = 0\n        self.last_requested_count = 0
+        self.last_parsed_count = 0
+        self.last_requested_count = 0
 
         if dtype is None:
             resolved_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
@@ -163,7 +184,7 @@ class Qwen35GenerativeListwiseRanker:
         self.processor = AutoProcessor.from_pretrained(model_id)
         self.model = AutoModelForMultimodalLM.from_pretrained(
             model_id,
-            torch_dtype=resolved_dtype,
+            dtype=resolved_dtype,
             device_map=device_map,
         )
         self.model.eval()
@@ -173,9 +194,16 @@ class Qwen35GenerativeListwiseRanker:
             self.last_output = "[]"
             self.last_parse_complete = True
             self.last_parse_strategy = "empty"
-            self.last_parsed_count = 0\n            self.last_requested_count = 0\n            return []
+            self.last_parsed_count = 0
+            self.last_requested_count = 0
+            return []
 
-        requested_count = min(self.output_count, len(documents))\n        prompt = build_generative_listwise_prompt(\n            query_text,\n            documents,\n            output_count=requested_count,\n        )
+        requested_count = min(self.output_count, len(documents))
+        prompt = build_generative_listwise_prompt(
+            query_text,
+            documents,
+            output_count=requested_count,
+        )
         messages = [
             {
                 "role": "user",
@@ -193,7 +221,15 @@ class Qwen35GenerativeListwiseRanker:
         inputs = inputs.to(self.model.device)
         input_length = int(inputs["input_ids"].shape[-1])
 
-        outputs = self.model.generate(\n            **inputs,\n            max_new_tokens=self.max_new_tokens,\n            do_sample=True,\n            temperature=0.7,\n            top_p=0.8,\n            top_k=20,\n            use_cache=True,\n        )
+        outputs = self.model.generate(
+            **inputs,
+            max_new_tokens=self.max_new_tokens,
+            do_sample=True,
+            temperature=0.7,
+            top_p=0.8,
+            top_k=20,
+            use_cache=True,
+        )
 
         generated = outputs[0][input_length:]
         output_text = self.processor.decode(
@@ -201,11 +237,17 @@ class Qwen35GenerativeListwiseRanker:
             skip_special_tokens=True,
         ).strip()
 
-        order, complete, strategy, explicit_count = parse_ranked_candidate_ids(\n            output_text,\n            len(documents),\n            expected_count=requested_count,\n        )
+        order, complete, strategy, explicit_count = parse_ranked_candidate_ids(
+            output_text,
+            len(documents),
+            expected_count=requested_count,
+        )
 
         self.last_output = output_text
         self.last_parse_complete = complete
-        self.last_parse_strategy = strategy\n        self.last_parsed_count = explicit_count\n        self.last_requested_count = requested_count
+        self.last_parse_strategy = strategy
+        self.last_parsed_count = explicit_count
+        self.last_requested_count = requested_count
 
         return [
             {
@@ -222,7 +264,9 @@ def resolve_v51_ranker(
     *,
     device: str | None = None,
     qwen_dtype: str | None = None,
-    qwen_max_new_tokens: int = 192,\n    qwen_output_count: int = 15,\n):
+    qwen_max_new_tokens: int = 192,
+    qwen_output_count: int = 15,
+):
     key = str(name).strip().lower()
 
     if key in {"jina", "jina-v3.5", DEFAULT_JINA_LISTWISE.lower()}:
@@ -248,7 +292,9 @@ def resolve_v51_ranker(
                 DEFAULT_QWEN35_LISTWISE,
                 device=device,
                 dtype=qwen_dtype,
-                max_new_tokens=qwen_max_new_tokens,\n                output_count=qwen_output_count,\n            ),
+                max_new_tokens=qwen_max_new_tokens,
+                output_count=qwen_output_count,
+            ),
         )
 
     raise ValueError(
