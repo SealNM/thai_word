@@ -1,6 +1,6 @@
 # V4 — V2.5 Candidate Retrieval + Instruction-Aware Reranking
 
-Status: **core implementation in progress**
+Status: **core implementation complete; real-model pilot pending**
 
 Branch: `feat/dictionary-semantic-v4-instruction-reranker`
 
@@ -88,6 +88,14 @@ Control model:
 - use only as a comparison model, not as the initial production dependency
 
 ## Phase C — Ranking variants
+
+Implementation status:
+
+- [x] `thai_reranker_v4.py` implements shared scoring and all three ranking modes.
+- [x] `scripts/search_v4.py` exposes V4 search from the command line.
+- [x] `scripts/evaluate_v4.py` scores each candidate pool once and compares all variants without repeated reranker inference.
+- [x] `tests/test_reranker_v4.py` covers prompt construction, safe protection, rerank, fusion, protected ordering, and fail-closed score validation.
+- [x] Core ranking tests pass 7/7 in the local no-model smoke test.
 
 Implement and compare all three without additional model calls:
 
@@ -201,3 +209,19 @@ If reranking improves precision but is too expensive for every production query,
 - No 9-way semantic relation classification.
 - No full-dictionary reranking.
 - No replacement of V2.5 before human evaluation.
+
+
+## Current checkpoint — 2026-09-14
+
+Core V4 code is implemented. The next required step is the real Qwen pilot on the existing 10-query evaluation set. No V2.5 or V3 production behavior has been replaced yet.
+
+Recommended first run:
+
+```bash
+python scripts/evaluate_v4.py \\
+  --dense-index <embeddinggemma-v2.5-index> \\
+  --reranker qwen3-0.6b \\
+  --candidate-pool 50 \\
+  --top-k 10 \\
+  --output artifacts/v4/qwen3-0.6b-pilot.json
+```
