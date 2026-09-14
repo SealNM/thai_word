@@ -1,5 +1,7 @@
 # V3 — Teacher Relation Dataset + EmbeddingGemma Fine-tuning
 
+> Teacher-generation strategy superseded by `plans/v3-1-local-teacher-router.md`. V3 compiler, fine-tuning, holdout, and evaluation design remain active.
+
 Status: **in progress**
 Branch: `feat/dictionary-semantic-v3-teacher-finetune`
 Base: `feat/dictionary-semantic-v2-5-embeddinggemma`
