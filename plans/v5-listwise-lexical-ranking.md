@@ -375,7 +375,7 @@ Implemented:
 - [x] Common contemporary Thai is preferred only among equally valid lexical substitutes.
 - [x] Keep the shared V2.5 top-50 retrieval pool.
 - [x] Add pure `instruct` mode.
-- [x] Add light V2.5 fusion control with V2.5 weight 0.2 and instruction-reranker weight 1.0.
+- [x] Add light V2.5 fusion control with V2.5 weight 0.1 and instruction-reranker weight 1.0. The original 0.2 control could overturn the instruction rank in a simple adversarial case, so V5.2 keeps V2.5 strictly secondary.
 - [x] Auto-select BF16 on supported CUDA hardware, otherwise FP16 on CUDA and FP32 on CPU.
 - [x] Add live progress, per-query latency, and ETA.
 - [x] Add `scripts/evaluate_v52.py`.
@@ -400,3 +400,15 @@ python -u scripts/evaluate_v52.py \
 ```
 
 If V5.2 still cannot obey the common-vs-rare priority reliably, the next meaningful control is a true listwise + instruction-following service such as Mixedbread's `mxbai-rerank-v3.1-listwise`, rather than another local general-purpose LLM experiment.
+
+
+### V5.2 fusion-test correction
+
+The first no-model test exposed that `v25_weight=0.2` was not actually light enough: a V2.5 rank-1 candidate at instruction rank 3 could beat an instruction rank-1 candidate that V2.5 had at rank 20.
+
+Decision:
+- reduce the V5.2 default V2.5 fusion weight to `0.1`;
+- keep instruction weight at `1.0`;
+- update the unit test to encode this intended behavior.
+
+This changes only the V5.2 fusion control; pure `instruct` mode is unaffected.
