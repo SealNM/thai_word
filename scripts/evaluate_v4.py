@@ -15,6 +15,7 @@ from thai_lexical_v1 import list_senses, load_artifacts
 from thai_reranker_v4 import (
     CrossEncoderPairScorer,
     V4Searcher,
+    load_tnc_commonness,
     rank_v4_candidates,
     resolve_reranker_profile,
 )
@@ -34,7 +35,7 @@ def _words(results: list[dict[str, Any]], count: int) -> list[str]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Compare V2.5 with Thai Words V4 reranking variants."
+        description="Compare V2.5 with Thai Words V4/V4.1 reranking variants."
     )
     parser.add_argument("--config", default="evaluation/v1_queries.json")
     parser.add_argument("--index", default="artifacts/v1")
@@ -44,10 +45,10 @@ def main() -> None:
     parser.add_argument(
         "--mode",
         action="append",
-        choices=["rerank", "fusion", "protected"],
-        help="Repeat to select variants. Defaults to all three.",
+        choices=["rerank", "fusion", "protected", "commonness"],
+        help="Repeat to select variants. Defaults to rerank, fusion, commonness.",
     )
-    parser.add_argument("--reranker", default="qwen3-0.6b")
+    parser.add_argument("--reranker", default="qwen3-0.6b-v4.1")
     parser.add_argument("--instruction", default=None)
     parser.add_argument("--no-instruction", action="store_true")
     parser.add_argument("--reranker-batch-size", type=int, default=16)
@@ -57,16 +58,32 @@ def main() -> None:
     parser.add_argument("--reranker-device", default=None)
     parser.add_argument("--v25-rank-weight", type=float, default=0.35)
     parser.add_argument("--reranker-rank-weight", type=float, default=1.0)
+    parser.add_argument(
+        "--commonness-source",
+        choices=["none", "tnc"],
+        default="tnc",
+    )
+    parser.add_argument(
+        "--commonness-weight",
+        action="append",
+        type=float,
+        help="Repeat to sweep commonness RRF weights. Defaults to 0.25, 0.5, 0.75, 1.0.",
+    )
     parser.add_argument("--v4-rrf-k", type=int, default=20)
     parser.add_argument("--output", default=None)
     args = parser.parse_args()
 
-    modes = args.mode or ["rerank", "fusion", "protected"]
+    modes = args.mode or ["rerank", "fusion", "commonness"]
+    commonness_weights = args.commonness_weight or [0.25, 0.5, 0.75, 1.0]
     config = _load_config(args.config)
     lexical = load_artifacts(args.index)
 
     dense_device = args.dense_device or args.device
     reranker_device = args.reranker_device or args.device
+
+    commonness: dict[str, int] | None = None
+    if args.commonness_source == "tnc":
+        commonness = load_tnc_commonness()
 
     load_started = perf_counter()
     v25 = HybridSearcher.from_paths(
@@ -88,7 +105,12 @@ def main() -> None:
         batch_size=args.reranker_batch_size,
         max_length=args.max_length,
     )
-    searcher = V4Searcher(v25=v25, scorer=scorer)
+    searcher = V4Searcher(
+        v25=v25,
+        scorer=scorer,
+        commonness=commonness,
+        commonness_source=args.commonness_source,
+    )
     load_seconds = perf_counter() - load_started
 
     report: dict[str, Any] = {
@@ -104,6 +126,11 @@ def main() -> None:
             "batch_size": args.reranker_batch_size,
         },
         "modes": modes,
+        "commonness": {
+            "source": args.commonness_source,
+            "weights": commonness_weights,
+            "entries": len(commonness or {}),
+        },
         "model_load_seconds": round(float(load_seconds), 3),
         "queries": [],
     }
@@ -128,17 +155,29 @@ def main() -> None:
             key=lambda item: int(item["v25_rank"]),
         )[: args.top_k]
 
-        variants = {
-            mode: rank_v4_candidates(
-                scored,
-                mode=mode,
-                top_k=args.top_k,
-                v25_weight=args.v25_rank_weight,
-                reranker_weight=args.reranker_rank_weight,
-                rrf_k=args.v4_rrf_k,
-            )
-            for mode in modes
-        }
+        variants: dict[str, list[dict[str, Any]]] = {}
+        for mode in modes:
+            if mode == "commonness":
+                for weight in commonness_weights:
+                    label = f"commonness-{weight:g}"
+                    variants[label] = rank_v4_candidates(
+                        scored,
+                        mode="commonness",
+                        top_k=args.top_k,
+                        v25_weight=args.v25_rank_weight,
+                        reranker_weight=args.reranker_rank_weight,
+                        commonness_weight=weight,
+                        rrf_k=args.v4_rrf_k,
+                    )
+            else:
+                variants[mode] = rank_v4_candidates(
+                    scored,
+                    mode=mode,
+                    top_k=args.top_k,
+                    v25_weight=args.v25_rank_weight,
+                    reranker_weight=args.reranker_rank_weight,
+                    rrf_k=args.v4_rrf_k,
+                )
 
         row = {
             "query": query,
@@ -152,11 +191,11 @@ def main() -> None:
         report["queries"].append(row)
 
         print(f"\n=== {query} [{spec.get('category')}] ===")
-        print("V2.5      :", " | ".join(_words(baseline, args.top_k)))
-        for mode in modes:
+        print("V2.5             :", " | ".join(_words(baseline, args.top_k)))
+        for label, results in variants.items():
             print(
-                f"V4 {mode:<9}: "
-                + " | ".join(_words(variants[mode], args.top_k))
+                f"V4 {label:<16}: "
+                + " | ".join(_words(results, args.top_k))
             )
 
     total_seconds = perf_counter() - total_started
