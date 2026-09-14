@@ -153,8 +153,8 @@ For each query compare:
 
 Pilot gates:
 
-- [ ] Run Qwen3-Reranker-0.6B on the 10-query set.
-- [ ] Inspect at least top 10 for every query.
+- [x] Run Qwen3-Reranker-0.6B on the 10-query set.
+- [x] Inspect at least top 10 for every query.
 - [ ] Confirm that known good V2.5 literary/near-synonym candidates are not systematically lost.
 - [ ] Confirm fewer antonyms, merely associated words, and definition-overlap accidents.
 - [ ] Record latency and peak practical GPU usage.
@@ -410,7 +410,8 @@ Changes:
 - [x] Default comparison uses only `rerank` and `fusion` so model capacity/category effects are not hidden by another commonness heuristic.
 - [x] Keep V4.2 `gated-commonness` available as an optional mode, but do not make it part of the primary V4.3 experiment.
 - [x] Add `--ignore-category` as a clean control if we need to isolate whether category context itself changes results.
-- [x] Add unit coverage for category propagation and both V4.3 model profiles.
+- [x] Add unit coverage for category propagation and both V4.3 model profiles (13 no-model unit cases currently defined).
+- [ ] Execute the updated unit suite in Colab after pulling V4.3.
 - [ ] Run V4.3 0.6B vs 4B on the same 10-query benchmark.
 - [ ] Compare `เดิน`, `รัก`, `มืด`, and `บ้าน` first because they expose grammatical/lexical-neighbor failures most clearly.
 - [ ] Check whether 4B improves common-vs-literary ordering without commonness assistance.
