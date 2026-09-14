@@ -1,3 +1,167 @@
+# Thai Lexical Semantic V3
+
+V3 ต่อจาก V2.5 โดยใช้ `google/embeddinggemma-300m` เป็นฐาน แล้วสร้าง relation dataset ภาษาไทยเฉพาะงานคลังคำสำหรับนักเขียน จาก candidate ที่มีอยู่จริงในพจนานุกรมและระบบ V2.5 ค้นมาได้ ก่อนใช้ LLM teacher จัดประเภท relation และ compile เป็น contrastive triplets สำหรับ fine-tuning
+
+> V3 ยังเป็นสาขาทดลอง ไม่แทน V2.5 production baseline จนกว่าจะผ่าน frozen holdout
+
+## V3 pipeline
+
+```text
+dictionary senses
+      │
+      ▼
+V2.5 hybrid candidate mining
+      │
+      ▼
+grounded teacher seeds
+      │
+      ▼
+Gemini relation classification
+      │
+      ├── synonym / near_synonym
+      ├── antonym
+      ├── subtype / supertype
+      ├── manner
+      ├── associated
+      └── unrelated / uncertain
+      │
+      ▼
+validation + holdout leakage guard
+      │
+      ▼
+(anchor, positive, hard_negative)
+      │
+      ▼
+EmbeddingGemma fine-tune
+CMNRL + NO_DUPLICATES + Matryoshka
+      │
+      ▼
+V3 768d / 256d benchmark
+```
+
+แผนฉบับเต็มอยู่ที่ `plans/v3-teacher-finetune.md`
+
+### V3 Colab smoke test
+
+เริ่มจาก branch ใหม่:
+
+```python
+%cd /content
+!rm -rf /content/thai_word
+!git clone -b feat/dictionary-semantic-v3-teacher-finetune https://github.com/SealNM/thai_word.git
+%cd /content/thai_word
+!pip install -r requirements.txt
+!python -m unittest discover -s tests
+```
+
+ต้องมี V1 lexical artifacts และ EmbeddingGemma 256d index ก่อน หาก runtime ใหม่ให้ build ตามขั้น V2.5 ด้านล่าง
+
+สร้าง teacher seeds ชุดเล็กก่อน:
+
+```python
+!python scripts/build_v3_teacher_seeds.py \
+  --index artifacts/v1 \
+  --dense-index artifacts/v2/embeddinggemma-300m-256 \
+  --sample-size 100 \
+  --candidate-count 24 \
+  --device cuda \
+  --output artifacts/v3/teacher_seeds.jsonl
+```
+
+ดู prompt/schema โดยยังไม่เสีย API:
+
+```python
+!python scripts/generate_v3_teacher_labels.py \
+  --input artifacts/v3/teacher_seeds.jsonl \
+  --dry-run
+```
+
+ตั้ง `GEMINI_API_KEY` ใน Colab Secrets แล้วโหลดเข้า environment จากนั้นทดลอง teacher เพียง 10 tasks:
+
+```python
+from google.colab import userdata
+import os
+
+os.environ["GEMINI_API_KEY"] = userdata.get("GEMINI_API_KEY")
+print("GEMINI_API_KEY ready:", bool(os.environ.get("GEMINI_API_KEY")))
+```
+
+```python
+!python scripts/generate_v3_teacher_labels.py \
+  --input artifacts/v3/teacher_seeds.jsonl \
+  --output artifacts/v3/teacher_labels.jsonl \
+  --limit 10
+```
+
+ตรวจและ compile:
+
+```python
+!python scripts/compile_v3_training_data.py \
+  --input artifacts/v3/teacher_labels.jsonl \
+  --index artifacts/v1 \
+  --triplets-output artifacts/v3/training_triplets.jsonl \
+  --graded-output artifacts/v3/graded_pairs.jsonl \
+  --report-output artifacts/v3/dataset_report.json
+
+!cat artifacts/v3/dataset_report.json
+```
+
+10 tasks ใช้เพื่อ smoke test เท่านั้น ยังไม่ควรเอาไปตัดสินคุณภาพโมเดล หาก schema/labels ถูกต้อง ให้เพิ่ม teacher dataset เป็นหลักร้อย/หลักพันก่อน train
+
+### V3 training
+
+เมื่อได้ triplets เพียงพอ:
+
+```python
+!python scripts/train_v3_embeddinggemma.py \
+  --train artifacts/v3/training_triplets.jsonl \
+  --output models/thai-words-embeddinggemma-v3 \
+  --epochs 1 \
+  --batch-size 32 \
+  --mini-batch-size 4
+```
+
+training script ใช้:
+- `CachedMultipleNegativesRankingLoss`
+- `BatchSamplers.NO_DUPLICATES`
+- native EmbeddingGemma query/document prompts
+- `MatryoshkaLoss` ที่ 768 / 512 / 256 / 128 dimensions
+- BF16 เฉพาะ GPU ที่รองรับ มิฉะนั้นใช้ float32
+- ไม่บังคับ FP16
+
+### Build V3 indexes หลัง train
+
+768d:
+
+```python
+!python scripts/build_dense_index.py \
+  --index artifacts/v1 \
+  --model models/thai-words-embeddinggemma-v3/final \
+  --model-key thai-words-v3 \
+  --native-retrieval \
+  --output artifacts/v3/index-768 \
+  --device cuda \
+  --batch-size 32
+```
+
+256d:
+
+```python
+!python scripts/build_dense_index.py \
+  --index artifacts/v1 \
+  --model models/thai-words-embeddinggemma-v3/final \
+  --model-key thai-words-v3-256 \
+  --native-retrieval \
+  --truncate-dim 256 \
+  --output artifacts/v3/index-256 \
+  --device cuda \
+  --batch-size 32
+```
+
+จากนั้นใช้ `scripts/evaluate_v2.py` ตัวเดิมเทียบ base EmbeddingGemma กับ V3 ได้โดยไม่เปลี่ยน fusion/ranking
+
+---
+
 # Thai Lexical Semantic V2.5
 
 V2.5 ต่อจาก V2 โดยเก็บ lexical/sparse baseline และ hybrid fusion เดิมไว้ทั้งหมด แล้วเพิ่ม **EmbeddingGemma 300M** เป็น dense challenger เพื่อวัดว่าพื้นที่ embedding รุ่นเล็กที่ออกแบบมาสำหรับ retrieval โดยตรงให้ผลกับคำไทยสำหรับงานนักเขียนดีกว่า E5 หรือไม่ โดยยังไม่ fine-tune และยังไม่ใช้ LLM teacher
