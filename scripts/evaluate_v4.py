@@ -35,7 +35,7 @@ def _words(results: list[dict[str, Any]], count: int) -> list[str]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Compare V2.5 with Thai Words V4/V4.1 reranking variants."
+        description="Compare V2.5 with Thai Words V4/V4.1/V4.2 variants."
     )
     parser.add_argument("--config", default="evaluation/v1_queries.json")
     parser.add_argument("--index", default="artifacts/v1")
@@ -45,10 +45,16 @@ def main() -> None:
     parser.add_argument(
         "--mode",
         action="append",
-        choices=["rerank", "fusion", "protected", "commonness"],
-        help="Repeat to select variants. Defaults to rerank, fusion, commonness.",
+        choices=[
+            "rerank",
+            "fusion",
+            "protected",
+            "commonness",
+            "gated-commonness",
+        ],
+        help="Repeat to select variants. Defaults to rerank, fusion, gated-commonness.",
     )
-    parser.add_argument("--reranker", default="qwen3-0.6b-v4.1")
+    parser.add_argument("--reranker", default="qwen3-0.6b-v4.2")
     parser.add_argument("--instruction", default=None)
     parser.add_argument("--no-instruction", action="store_true")
     parser.add_argument("--reranker-batch-size", type=int, default=16)
@@ -67,14 +73,20 @@ def main() -> None:
         "--commonness-weight",
         action="append",
         type=float,
-        help="Repeat to sweep commonness RRF weights. Defaults to 0.25, 0.5, 0.75, 1.0.",
+        help="Repeat to sweep V4.2 familiarity strength. Defaults to 0.5 and 1.0.",
     )
+    parser.add_argument("--commonness-promotion-cap", type=int, default=4)
+    parser.add_argument("--gate-lexical-tier", type=int, default=4)
+    parser.add_argument("--gate-reranker-top", type=int, default=12)
+    parser.add_argument("--gate-v25-top", type=int, default=20)
+    parser.add_argument("--gate-strict-reranker-top", type=int, default=5)
+    parser.add_argument("--gate-wide-v25-top", type=int, default=30)
     parser.add_argument("--v4-rrf-k", type=int, default=20)
     parser.add_argument("--output", default=None)
     args = parser.parse_args()
 
-    modes = args.mode or ["rerank", "fusion", "commonness"]
-    commonness_weights = args.commonness_weight or [0.25, 0.5, 0.75, 1.0]
+    modes = args.mode or ["rerank", "fusion", "gated-commonness"]
+    commonness_weights = args.commonness_weight or [0.5, 1.0]
     config = _load_config(args.config)
     lexical = load_artifacts(args.index)
 
@@ -129,7 +141,15 @@ def main() -> None:
         "commonness": {
             "source": args.commonness_source,
             "weights": commonness_weights,
+            "promotion_cap": args.commonness_promotion_cap,
             "entries": len(commonness or {}),
+        },
+        "semantic_gate": {
+            "lexical_tier": args.gate_lexical_tier,
+            "reranker_top": args.gate_reranker_top,
+            "v25_top": args.gate_v25_top,
+            "strict_reranker_top": args.gate_strict_reranker_top,
+            "wide_v25_top": args.gate_wide_v25_top,
         },
         "model_load_seconds": round(float(load_seconds), 3),
         "queries": [],
@@ -157,17 +177,23 @@ def main() -> None:
 
         variants: dict[str, list[dict[str, Any]]] = {}
         for mode in modes:
-            if mode == "commonness":
+            if mode == "gated-commonness":
                 for weight in commonness_weights:
-                    label = f"commonness-{weight:g}"
+                    label = f"gated-commonness-{weight:g}"
                     variants[label] = rank_v4_candidates(
                         scored,
-                        mode="commonness",
+                        mode="gated-commonness",
                         top_k=args.top_k,
                         v25_weight=args.v25_rank_weight,
                         reranker_weight=args.reranker_rank_weight,
                         commonness_weight=weight,
+                        commonness_promotion_cap=args.commonness_promotion_cap,
                         rrf_k=args.v4_rrf_k,
+                        gate_lexical_tier=args.gate_lexical_tier,
+                        gate_reranker_top=args.gate_reranker_top,
+                        gate_v25_top=args.gate_v25_top,
+                        gate_strict_reranker_top=args.gate_strict_reranker_top,
+                        gate_wide_v25_top=args.gate_wide_v25_top,
                     )
             else:
                 variants[mode] = rank_v4_candidates(
@@ -191,10 +217,10 @@ def main() -> None:
         report["queries"].append(row)
 
         print(f"\n=== {query} [{spec.get('category')}] ===")
-        print("V2.5             :", " | ".join(_words(baseline, args.top_k)))
+        print("V2.5                    :", " | ".join(_words(baseline, args.top_k)))
         for label, results in variants.items():
             print(
-                f"V4 {label:<16}: "
+                f"V4 {label:<22}: "
                 + " | ".join(_words(results, args.top_k))
             )
 
