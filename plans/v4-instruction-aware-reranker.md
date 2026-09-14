@@ -1,6 +1,6 @@
 # V4 — V2.5 Candidate Retrieval + Instruction-Aware Reranking
 
-Status: **core implementation complete; real-model pilot pending**
+Status: **V4 pilot complete; V4.1 commonness experiment implemented, real-model rerun pending**
 
 Branch: `feat/dictionary-semantic-v4-instruction-reranker`
 
@@ -225,3 +225,77 @@ python scripts/evaluate_v4.py \\
   --top-k 10 \\
   --output artifacts/v4/qwen3-0.6b-pilot.json
 ```
+
+
+## V4 pilot findings — 2026-09-14
+
+The first real Qwen3-Reranker-0.6B pilot completed on all 10 benchmark queries.
+
+Observed strengths:
+- `โกรธ`: surfaced useful common/near alternatives such as ขุ่นเคือง / โกรธขึ้ง / ดาลเดือด.
+- `สวย`: promoted งดงาม strongly.
+- `พูด`: found เอ่ย / ตรัส / เจรจา / เว้า / พูดจา.
+- `เร็ว`: found ฉับไว / รวดเร็ว / ว่องไว.
+- `กลัว`: found หวาดกลัว / หวาดเกรง / หวั่นหวาด.
+- `บ้าน`: retrieved เรือน / บ้านเรือน / บ้านช่อง / บ้านช่องห้องหอ into the candidate set.
+
+Observed failures:
+- semantic relatedness still leaks into reranking: เดิน -> วิ่ง, ฝน -> น้ำตก, รัก -> คู่รัก, มืด -> เดือนมืด.
+- rare/literary dictionary synonyms often outrank common contemporary alternatives.
+- increasing V2.5 fusion weight is not sufficient because V2.5 itself also favors many dictionary/rare forms.
+- hard `protected` ordering is not reliable enough to remain the preferred path.
+
+Decision:
+1. Keep `protected` only as an experimental compatibility mode.
+2. Make V4.1 focus on strict lexical substitutability plus an independent commonness signal.
+3. Do not solve commonness by increasing V2.5 weight.
+
+## V4.1 — Strict substitutability + Thai commonness
+
+Implementation:
+- [x] Add `qwen3-0.6b-v4.1` prompt profile.
+- [x] Explicitly require sentence-level substitutability, intended sense preservation, and roughly matching grammatical role.
+- [x] Explicitly prefer contemporary/common Thai over rare/literary alternatives when semantic quality is equal.
+- [x] Penalize semantic-neighbor failure modes: manner/subtype changes, associated objects/events, compounds/collocations, cause/effect, and definition mention overlap.
+- [x] Add Thai National Corpus unigram frequency as a soft commonness source through the existing PyThaiNLP dependency.
+- [x] Add `commonness` ranking mode: V2.5 rank + reranker rank + optional commonness rank using weighted RRF.
+- [x] Missing frequency never becomes a hard penalty; it simply receives no commonness boost.
+- [x] Add evaluator weight sweep so 0.25 / 0.5 / 0.75 / 1.0 commonness weights reuse the same reranker inference.
+- [x] Change V4.1 CLI defaults to strict prompt + commonness mode.
+- [x] Add unit coverage for the new prompt and commonness fusion logic.
+- [ ] Run the 10-query real-model V4.1 rerun in Colab.
+- [ ] Inspect `บ้าน` especially for เรือน / บ้านเรือน / บ้านช่อง / บ้านช่องห้องหอ vs เวศม์ / วาสะ / อธิวาส.
+- [ ] Inspect semantic-safety regressions on เดิน / ฝน / รัก / มืด.
+- [ ] Choose a commonness weight only after human inspection.
+
+### Commonness data decision
+
+Do not use the Python `wordfreq` package for Thai commonness: its published supported-language list does not include Thai.
+
+Initial V4.1 source:
+- Thai National Corpus unigram frequencies exposed by `pythainlp.corpus.tnc`.
+
+Later control experiment:
+- Phupha Thai Word Frequency Dataset (Common Crawl July 2025) can be compared after the TNC pilot. Keep it separate initially so we can see whether the commonness signal itself helps before adding another corpus.
+
+### Recommended V4.1 pilot
+
+```bash
+python scripts/evaluate_v4.py \
+  --dense-index artifacts/v2/embeddinggemma-300m-256 \
+  --reranker qwen3-0.6b-v4.1 \
+  --candidate-pool 50 \
+  --top-k 10 \
+  --device cuda \
+  --mode rerank \
+  --mode fusion \
+  --mode commonness \
+  --commonness-source tnc \
+  --commonness-weight 0.25 \
+  --commonness-weight 0.5 \
+  --commonness-weight 0.75 \
+  --commonness-weight 1.0 \
+  --output artifacts/v4/qwen3-0.6b-v4.1-tnc-pilot.json
+```
+
+The four commonness variants use the same Qwen scores; the model is not rerun four times.
