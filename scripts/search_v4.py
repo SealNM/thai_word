@@ -20,7 +20,7 @@ from thai_reranker_v4 import (
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Search Thai Words V4.1: V2.5 + strict reranking + commonness."
+        description="Search Thai Words V4.2: semantic-gated commonness reranking."
     )
     parser.add_argument("query", help="Thai headword or phrase.")
     parser.add_argument("--index", default="artifacts/v1")
@@ -30,13 +30,19 @@ def main() -> None:
     parser.add_argument("--candidate-pool", type=int, default=50)
     parser.add_argument(
         "--mode",
-        choices=["rerank", "fusion", "protected", "commonness"],
-        default="commonness",
+        choices=[
+            "rerank",
+            "fusion",
+            "protected",
+            "commonness",
+            "gated-commonness",
+        ],
+        default="gated-commonness",
     )
     parser.add_argument(
         "--reranker",
-        default="qwen3-0.6b-v4.1",
-        help="Profile name (qwen3-0.6b-v4.1, qwen3-0.6b, bge-v2-m3) or model id.",
+        default="qwen3-0.6b-v4.2",
+        help="Profile name (qwen3-0.6b-v4.2, qwen3-0.6b-v4.1, qwen3-0.6b, bge-v2-m3) or model id.",
     )
     parser.add_argument("--instruction", default=None)
     parser.add_argument("--no-instruction", action="store_true")
@@ -53,7 +59,8 @@ def main() -> None:
     parser.add_argument("--v25-rank-weight", type=float, default=0.35)
     parser.add_argument("--reranker-rank-weight", type=float, default=1.0)
     parser.add_argument("--commonness-source", choices=["none", "tnc"], default="tnc")
-    parser.add_argument("--commonness-rank-weight", type=float, default=0.5)
+    parser.add_argument("--commonness-rank-weight", type=float, default=0.75)
+    parser.add_argument("--commonness-promotion-cap", type=int, default=4)
     parser.add_argument("--v4-rrf-k", type=int, default=20)
     parser.add_argument("--list-senses", action="store_true")
     args = parser.parse_args()
@@ -111,6 +118,7 @@ def main() -> None:
         v25_rank_weight=args.v25_rank_weight,
         reranker_rank_weight=args.reranker_rank_weight,
         commonness_rank_weight=args.commonness_rank_weight,
+        commonness_promotion_cap=args.commonness_promotion_cap,
         v4_rrf_k=args.v4_rrf_k,
     )
     print(json.dumps(results, ensure_ascii=False, indent=2))
