@@ -129,3 +129,44 @@ Scaling policy:
 - Evaluate held-out retrieval quality after each dataset expansion.
 - Continue adding teacher data only while holdout quality materially improves.
 - Full-dictionary labeling is an optional later experiment, not a V3.1 requirement.
+
+
+## Quality finding from first 10-label sample
+
+The uploaded first-round local teacher output contained:
+- 10 anchors
+- 80 judgments
+- unrelated: 38
+- near_synonym: 15
+- subtype: 10
+- synonym: 5
+- associated: 5
+- supertype: 4
+- antonym: 2
+- uncertain: 1
+- mean confidence ~0.899
+- only 8/80 judgments below confidence 0.75
+
+Manual inspection found important high-confidence ontology mistakes, including confusion between:
+- near_synonym vs associated
+- subtype/supertype direction
+- subtype vs directly replaceable word
+- unrelated vs potentially replaceable word
+
+Therefore confidence-only auditing is insufficient, and 9-way local relation classification must not be used directly as the sole training-data source.
+
+### Direct selector path
+
+Added:
+- [x] `scripts/select_v31_triplets_local.py`
+  - asks Qwen only for 0-2 safe positives and 0-2 hard negatives per anchor
+  - uses <=8 routed candidates
+  - compact JSON
+  - default batch size 8
+  - default output budget 96 tokens
+  - selection confidence must be >=80
+- [x] `scripts/compile_v31_selector_triplets.py`
+  - compiles selected positives/hard negatives directly
+  - keeps frozen holdout checks
+
+The 9-way relation classifier remains useful for audit/analysis, but the direct selector is now the preferred local path for contrastive training.
