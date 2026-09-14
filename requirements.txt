@@ -8,4 +8,4 @@ sentence-transformers>=6.0.1,<7
 transformers>=4.56.0,<6
 datasets>=3.0
 accelerate>=1.0
-google-genai>=1.0
+google-genai>=2.22,<3
