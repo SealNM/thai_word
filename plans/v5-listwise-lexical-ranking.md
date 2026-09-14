@@ -1,6 +1,6 @@
 # V5 — Listwise Lexical Ranking
 
-Status: **V5.1 Qwen experiment complete; V5.2 instruction-following multilingual reranker implemented, real-model pilot pending**
+Status: **V5.2 pilot complete; model-hopping paused, V5.3 rarity-penalty reranking proposed**
 
 Branch: `feat/dictionary-semantic-v5-listwise-ranker`
 
@@ -248,7 +248,7 @@ Implemented on the same V5 branch:
 - [ ] Run the real Jina-vs-Qwen3.5 shared-top-50 comparison.
 - [ ] Inspect parse completeness; a frequent recovered/partial Qwen output is itself a failure signal.
 - [ ] Compare `บ้าน / สวย / เร็ว` common-vs-rare ordering.
-- [ ] Confirm `เดิน / ฝน / รัก / มืด` do not regress on semantic validity.
+- [x] Confirm `เดิน / ฝน / รัก / มืด` do not regress on semantic validity.
 - [ ] Compare seconds/query and model load time.
 
 ### Qwen3.5 runtime note
@@ -380,11 +380,11 @@ Implemented:
 - [x] Add live progress, per-query latency, and ETA.
 - [x] Add `scripts/evaluate_v52.py`.
 - [x] Add no-model unit coverage in `tests/test_instruct_v52.py`.
-- [ ] Run V5.2 tests in Colab.
-- [ ] Run the 10-query V5.2 real-model pilot.
-- [ ] Inspect `บ้าน / สวย / เร็ว` for common-vs-rare ordering.
+- [x] Run V5.2 tests in Colab.
+- [x] Run the 10-query V5.2 real-model pilot.
+- [x] Inspect `บ้าน / สวย / เร็ว` for common-vs-rare ordering.
 - [ ] Confirm `เดิน / ฝน / รัก / มืด` do not regress on semantic validity.
-- [ ] Compare latency against Jina (~3.13s/query) and Qwen3.5 (~2.94s/query).
+- [x] Compare latency against Jina (~3.13s/query) and Qwen3.5 (~2.94s/query).
 
 Recommended pilot:
 
@@ -412,3 +412,71 @@ Decision:
 - update the unit test to encode this intended behavior.
 
 This changes only the V5.2 fusion control; pure `instruct` mode is unaffected.
+
+
+## V5.2 real-model finding — instruction-following reranker is not the answer
+
+Runtime:
+- Model load: ~72s.
+- 10-query run: ~89s total.
+- Average: ~8.86s/query.
+- This is materially slower than Jina v3.5 (~3.13s/query) and Qwen3.5-0.8B (~2.94s/query).
+
+Quality:
+- `สวย` improved in one important way: `งาม / งดงาม` moved near the top.
+- `พูด` remained usable around `พูดจา / จา / กล่าว / เจรจา`.
+
+However the model regressed or remained weak on the critical failure cases:
+- `เดิน`: `วิ่ง` ranked #2, worse than Jina listwise.
+- `มืด`: `มุมมืด / หน้ามืด / เดือนมืด` outranked direct darkness substitutes.
+- `รัก`: `ที่รัก / สารภาพ / คู่รัก` leaked into the top results.
+- `บ้าน`: `ภูม / นิเวศ- / เวศม์ / อธิวาส / วาสะ` still dominated; `บ้านเรือน / เรือน / บ้านช่อง` did not become the desired top group.
+- `เร็ว`: rare forms such as `เชาว์ / รยะ / ระเร็ว / สีฆ-` remained too high.
+- `กลัว`: `กระดก` leaked into the top set.
+
+Decision:
+- [x] Stop the ContextualAI V5.2 path.
+- [x] Pause further local model-hopping for this ranking problem.
+- [x] Keep Jina v3.5 as the strongest semantic-ranking research baseline so far.
+- [x] Treat the remaining issue as a product-specific ordering problem: semantically valid candidates are often present, but rare dictionary forms are over-promoted.
+
+## V5.3 proposed direction — semantic rank + rarity penalty, not commonness boost
+
+Previous commonness fusion failed because high-frequency unrelated words received a positive boost. V5.3 should invert that design:
+
+> Commonness must never create semantic relevance. It may only demote candidates that are demonstrably rare.
+
+Proposed architecture:
+
+```text
+V2.5 top 50
+    ↓
+Jina v3.5 listwise semantic ranking
+    ↓
+top semantic band / score-aware window
+    ↓
+rarity penalty only
+    - no positive frequency boost
+    - token-aware phrase familiarity
+    - capped demotion
+    ↓
+top 10
+```
+
+Design rules:
+1. Jina remains the semantic ordering signal.
+2. TNC/commonness is used only as a **negative rarity prior**.
+3. Very common words never get bonus points merely for being frequent.
+4. Rare/archaic candidates can move down only a bounded number of positions.
+5. Multiword forms such as `บ้านเรือน / บ้านช่องห้องหอ` use token-aware familiarity so they are not penalized solely because the exact phrase is sparse.
+6. Apply the penalty only inside a semantic window (for example Jina top 15–20 or score-near-top band), so unrelated candidates cannot enter from the tail.
+7. Sweep only small demotion caps (for example 2 / 4 / 6) rather than broad frequency weights.
+8. Inspect raw Jina listwise scores and TNC counts in the evaluator before choosing a production threshold.
+
+Primary expected effect:
+- `บ้าน`: demote `วาสะ / เวศม์ / วสนะ / อธิวาส` enough for `เรือน / บ้านเรือน / บ้านช่อง` to surface, without boosting generic `ที่ / อยู่ / ปลูก`.
+- `สวย`: allow `งดงาม / งาม` to pass rarer dictionary forms.
+- `เร็ว`: allow `ไว / รวดเร็ว / ด่วน` to pass `รยะ / สีฆ- / เชาว์`.
+- Preserve Jina's semantic win on `เดิน`, where `วิ่ง` already ranks below direct walking alternatives.
+
+This is now preferred over testing another local reranker model.
