@@ -52,6 +52,15 @@ def main() -> None:
         default=None,
         help="Optional display key stored in dense metadata.",
     )
+    parser.add_argument(
+        "--max-seq-length",
+        type=int,
+        default=None,
+        help=(
+            "Optional tokenizer/model sequence cap. Useful for decoder-style "
+            "embedding models on memory-limited GPUs."
+        ),
+    )
     args = parser.parse_args()
 
     profile_overrides = {}
@@ -68,6 +77,8 @@ def main() -> None:
         profile_overrides["truncate_dim"] = args.truncate_dim
     if args.model_key:
         profile_overrides["key"] = args.model_key
+    if args.max_seq_length is not None:
+        profile_overrides["max_seq_length"] = args.max_seq_length
 
     lexical = load_artifacts(args.index)
     metadata = build_dense_index(
