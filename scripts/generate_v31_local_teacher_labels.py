@@ -5,6 +5,7 @@ import argparse
 import json
 import re
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -17,67 +18,72 @@ from thai_v31_router import LOCAL_LABEL_SOURCE, local_candidates
 
 JSON_FENCE_RE = re.compile(r"^\s*```(?:json)?\s*|\s*```\s*$", re.IGNORECASE)
 
+RELATION_CODES = {
+    "s": "synonym",
+    "n": "near_synonym",
+    "a": "antonym",
+    "t": "subtype",
+    "g": "supertype",
+    "m": "manner",
+    "x": "associated",
+    "u": "unrelated",
+    "?": "uncertain",
+}
+
+REGISTER_CODES = {
+    "n": "neutral",
+    "l": "literary",
+    "f": "formal",
+    "c": "colloquial",
+    "a": "archaic",
+    "t": "technical",
+    "s": "slang",
+    "u": "unknown",
+}
+
 
 def _prompt(row: dict[str, Any]) -> str:
     anchor = row["anchor"]
     candidates = [
-        {
-            "word": candidate["word"],
-            "definition": candidate["definition"],
-        }
-        for candidate in local_candidates(row)
+        [index, candidate["word"], candidate["definition"]]
+        for index, candidate in enumerate(local_candidates(row))
     ]
 
     return f"""
-คุณเป็นผู้เชี่ยวชาญภาษาไทยและกำลังช่วยสร้างข้อมูลฝึกสำหรับระบบค้นคำของนักเขียน
+จัดประเภทความสัมพันธ์คำไทยสำหรับระบบค้นคำของนักเขียน
 
-คำหลัก:
-- คำ: {anchor["word"]}
-- sense {anchor["sense"]}: {anchor["definition"]}
+คำหลัก: {anchor["word"]}
+ความหมาย: {anchor["definition"]}
 
-ตัดสิน candidate ทุกคำต่อไปนี้ตาม sense นี้เท่านั้น:
-{json.dumps(candidates, ensure_ascii=False)}
+candidate แต่ละรายการคือ [id,คำ,นิยาม]:
+{json.dumps(candidates, ensure_ascii=False, separators=(",", ":"))}
 
-relation เลือกหนึ่งค่าเท่านั้น:
-synonym, near_synonym, antonym, subtype, supertype, manner, associated, unrelated, uncertain
+relation code:
+s=synonym ใช้แทนตรงมาก
+n=near_synonym ใกล้และใช้แทนได้หลายบริบทแต่มี nuance
+a=antonym ตรงข้าม
+t=subtype ชนิดย่อย/รูปเฉพาะ
+g=supertype ความหมายกว้างกว่า
+m=manner วิธี/ลักษณะเฉพาะของการกระทำ
+x=associated เกี่ยวข้องแต่ใช้แทนไม่ได้
+u=unrelated ไม่เกี่ยวข้อง
+?=uncertain หลักฐานไม่พอ
 
-เกณฑ์:
-- synonym = ใช้แทนกันได้ตรงมาก
-- near_synonym = ใกล้เคียงและใช้แทนกันได้หลายบริบท แต่มี nuance/register ต่าง
-- antonym = ตรงข้าม/contrast ชัด
-- subtype = candidate เป็นชนิดย่อยหรือรูปเฉพาะของคำหลัก
-- supertype = candidate กว้างกว่าคำหลัก
-- manner = วิธี/ลักษณะเฉพาะของการกระทำ เช่น กระซิบ ต่อ พูด
-- associated = เกี่ยวข้องกันแต่ใช้แทนกันไม่ได้
-- unrelated = ไม่เกี่ยวข้องอย่างมีนัยสำคัญ
-- uncertain = หลักฐานไม่พอ
+register code:
+n=neutral,l=literary,f=formal,c=colloquial,a=archaic,t=technical,s=slang,u=unknown
 
-semantic_relatedness: 0-4
-replaceability: 0-3
-confidence: 0.0-1.0
-register: neutral, literary, formal, colloquial, archaic, technical, slang, unknown
+ตอบ JSON อย่างเดียว:
+{{"j":[[id,relation,relatedness,replaceability,confidence,register],...]}}
 
-คำเตือน:
-- antonym อาจ related สูง แต่ replaceability ต้อง 0
-- คำที่อยู่ในสถานการณ์เดียวกันไม่ได้แปลว่าเป็น synonym
-- อย่าสร้าง candidate ใหม่
-- ต้องตอบครบทุก candidate
-- reason ใช้ภาษาไทยสั้น ๆ
+relatedness=0..4
+replaceability=0..3
+confidence=0..100
 
-ตอบเป็น JSON เท่านั้น รูปแบบ:
-{{
-  "judgments": [
-    {{
-      "candidate_word": "คำเดิมตามรายการ",
-      "relation": "synonym",
-      "semantic_relatedness": 4,
-      "replaceability": 3,
-      "confidence": 0.95,
-      "register": "neutral",
-      "reason": "เหตุผลสั้น ๆ"
-    }}
-  ]
-}}
+กฎ:
+- ต้องตอบครบทุก id และเรียงตาม id
+- antonym ต้อง replaceability=0
+- คำที่แค่เกี่ยวข้องกันไม่ใช่ synonym
+- ห้ามเพิ่ม candidate
 """.strip()
 
 
@@ -97,60 +103,73 @@ def _extract_json(text: str) -> dict[str, Any]:
     return parsed
 
 
-def _validate_judgments(
+def _validate_compact_judgments(
     result: dict[str, Any],
     expected_words: list[str],
 ) -> dict[str, dict[str, Any]]:
-    judgments = result.get("judgments")
+    judgments = result.get("j")
     if not isinstance(judgments, list):
-        raise ValueError("Local teacher response is missing judgments array.")
+        raise ValueError("Local teacher response is missing compact 'j' array.")
 
-    expected = set(expected_words)
     by_word: dict[str, dict[str, Any]] = {}
+    seen_ids: set[int] = set()
 
-    for judgment in judgments:
-        if not isinstance(judgment, dict):
-            raise ValueError("Each judgment must be an object.")
-        word = str(judgment.get("candidate_word", "")).strip()
-        if word not in expected:
-            raise ValueError(f"Unexpected candidate_word: {word!r}")
-        if word in by_word:
-            raise ValueError(f"Duplicate judgment for {word!r}")
+    for item in judgments:
+        if not isinstance(item, list) or len(item) != 6:
+            raise ValueError(
+                "Every compact judgment must be "
+                "[id,relation,relatedness,replaceability,confidence,register]."
+            )
 
-        relation = judgment.get("relation")
-        if relation not in RELATIONS:
-            raise ValueError(f"Invalid relation for {word!r}: {relation!r}")
+        candidate_id = int(item[0])
+        if candidate_id < 0 or candidate_id >= len(expected_words):
+            raise ValueError(f"Candidate id out of range: {candidate_id}")
+        if candidate_id in seen_ids:
+            raise ValueError(f"Duplicate candidate id: {candidate_id}")
+        seen_ids.add(candidate_id)
 
-        relatedness = int(judgment.get("semantic_relatedness"))
-        replaceability = int(judgment.get("replaceability"))
-        confidence = float(judgment.get("confidence"))
-        register = judgment.get("register", "unknown")
+        relation_code = str(item[1])
+        register_code = str(item[5])
+        if relation_code not in RELATION_CODES:
+            raise ValueError(f"Invalid relation code: {relation_code!r}")
+        if register_code not in REGISTER_CODES:
+            raise ValueError(f"Invalid register code: {register_code!r}")
+
+        relation = RELATION_CODES[relation_code]
+        register = REGISTER_CODES[register_code]
+        if relation not in RELATIONS or register not in REGISTERS:
+            raise ValueError("Compact code resolved outside V3 schema.")
+
+        relatedness = int(item[2])
+        replaceability = int(item[3])
+        confidence_raw = int(item[4])
 
         if not 0 <= relatedness <= 4:
-            raise ValueError(f"semantic_relatedness out of range for {word!r}")
+            raise ValueError(f"semantic_relatedness out of range for id {candidate_id}")
         if not 0 <= replaceability <= 3:
-            raise ValueError(f"replaceability out of range for {word!r}")
-        if not 0.0 <= confidence <= 1.0:
-            raise ValueError(f"confidence out of range for {word!r}")
-        if register not in REGISTERS:
-            raise ValueError(f"Invalid register for {word!r}: {register!r}")
+            raise ValueError(f"replaceability out of range for id {candidate_id}")
+        if not 0 <= confidence_raw <= 100:
+            raise ValueError(f"confidence out of range for id {candidate_id}")
 
         if relation == "antonym":
             replaceability = 0
 
+        word = expected_words[candidate_id]
         by_word[word] = {
             "relation": relation,
             "semantic_relatedness": relatedness,
             "replaceability": replaceability,
-            "confidence": confidence,
+            "confidence": round(confidence_raw / 100.0, 4),
             "register": register,
-            "reason": str(judgment.get("reason", "")).strip(),
+            "reason": "",
             "label_source": LOCAL_LABEL_SOURCE,
         }
 
-    missing = [word for word in expected_words if word not in by_word]
-    if missing:
-        raise ValueError(f"Missing judgments: {missing}")
+    missing_ids = [
+        index for index in range(len(expected_words)) if index not in seen_ids
+    ]
+    if missing_ids:
+        raise ValueError(f"Missing compact candidate ids: {missing_ids}")
     return by_word
 
 
@@ -174,6 +193,9 @@ def _load_model(model_id: str, *, four_bit: bool):
         )
 
     tokenizer = AutoTokenizer.from_pretrained(model_id)
+    tokenizer.padding_side = "left"
+    if tokenizer.pad_token_id is None:
+        tokenizer.pad_token_id = tokenizer.eos_token_id
 
     kwargs: dict[str, Any] = {
         "device_map": "auto",
@@ -188,43 +210,51 @@ def _load_model(model_id: str, *, four_bit: bool):
         )
         kwargs["dtype"] = torch.float16
     else:
-        if torch.cuda.is_bf16_supported():
-            kwargs["dtype"] = torch.bfloat16
-        else:
-            kwargs["torch_dtype"] = torch.float16
+        kwargs["dtype"] = (
+            torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+        )
 
     model = AutoModelForCausalLM.from_pretrained(model_id, **kwargs)
     model.eval()
     return tokenizer, model
 
 
-def _generate(
-    tokenizer,
-    model,
-    prompt: str,
-    *,
-    max_new_tokens: int,
-) -> str:
-    import torch
-
+def _chat_text(tokenizer, prompt: str) -> str:
     messages = [
         {
             "role": "system",
             "content": (
-                "ตอบตามคำสั่งอย่างแม่นยำ ห้ามอธิบายนอก JSON "
-                "และห้ามเพิ่ม candidate ที่ผู้ใช้ไม่ได้ให้"
+                "ตอบตาม schema เท่านั้น ห้ามอธิบายนอก JSON "
+                "ห้ามเพิ่มหรือลด candidate"
             ),
         },
         {"role": "user", "content": prompt},
     ]
-    inputs = tokenizer.apply_chat_template(
+    return tokenizer.apply_chat_template(
         messages,
         add_generation_prompt=True,
-        tokenize=True,
-        return_dict=True,
+        tokenize=False,
+    )
+
+
+def _generate_batch(
+    tokenizer,
+    model,
+    prompts: list[str],
+    *,
+    max_new_tokens: int,
+) -> list[str]:
+    import torch
+
+    texts = [_chat_text(tokenizer, prompt) for prompt in prompts]
+    inputs = tokenizer(
+        texts,
+        add_special_tokens=False,
+        padding=True,
         return_tensors="pt",
     )
     inputs = {key: value.to(model.device) for key, value in inputs.items()}
+    input_width = inputs["input_ids"].shape[1]
 
     with torch.inference_mode():
         outputs = model.generate(
@@ -232,60 +262,25 @@ def _generate(
             max_new_tokens=max_new_tokens,
             do_sample=False,
             use_cache=True,
-            pad_token_id=tokenizer.eos_token_id,
+            pad_token_id=tokenizer.pad_token_id,
+            eos_token_id=tokenizer.eos_token_id,
         )
 
-    generated = outputs[0, inputs["input_ids"].shape[-1] :]
-    return tokenizer.decode(generated, skip_special_tokens=True).strip()
+    return [
+        tokenizer.decode(
+            output[input_width:],
+            skip_special_tokens=True,
+        ).strip()
+        for output in outputs
+    ]
 
 
-def _label_row(
+def _apply_judgments(
     row: dict[str, Any],
-    tokenizer,
-    model,
+    judgments: dict[str, dict[str, Any]],
     *,
     model_id: str,
-    max_new_tokens: int,
 ) -> dict[str, Any]:
-    pending = local_candidates(row)
-    if not pending:
-        output = json.loads(json.dumps(row, ensure_ascii=False))
-        output["teacher"] = {
-            "provider": "rules_only",
-            "version": "3.1",
-            "generated_at": datetime.now(timezone.utc).isoformat(),
-        }
-        return output
-
-    expected_words = [candidate["word"] for candidate in pending]
-    prompt = _prompt(row)
-    raw = _generate(
-        tokenizer,
-        model,
-        prompt,
-        max_new_tokens=max_new_tokens,
-    )
-
-    try:
-        judgments = _validate_judgments(_extract_json(raw), expected_words)
-    except Exception:
-        repair_prompt = (
-            prompt
-            + "\n\nคำตอบก่อนหน้ามีรูปแบบไม่ถูกต้อง แก้ให้เป็น JSON ที่ valid "
-            "และต้องมี candidate ครบตามรายการเท่านั้น\nคำตอบก่อนหน้า:\n"
-            + raw
-        )
-        repaired = _generate(
-            tokenizer,
-            model,
-            repair_prompt,
-            max_new_tokens=max_new_tokens,
-        )
-        judgments = _validate_judgments(
-            _extract_json(repaired),
-            expected_words,
-        )
-
     output = json.loads(json.dumps(row, ensure_ascii=False))
     for candidate in output["candidates"]:
         if isinstance(candidate.get("judgment"), dict):
@@ -297,15 +292,52 @@ def _label_row(
     output["teacher"] = {
         "provider": "local",
         "model": model_id,
-        "version": "3.1",
+        "version": "3.1-compact-batch",
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
     return output
 
 
+def _rules_only_row(row: dict[str, Any]) -> dict[str, Any]:
+    output = json.loads(json.dumps(row, ensure_ascii=False))
+    output["teacher"] = {
+        "provider": "rules_only",
+        "version": "3.1-compact-batch",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    return output
+
+
+def _repair_one(
+    row: dict[str, Any],
+    raw: str,
+    tokenizer,
+    model,
+    *,
+    max_new_tokens: int,
+) -> dict[str, dict[str, Any]]:
+    expected_words = [candidate["word"] for candidate in local_candidates(row)]
+    prompt = (
+        _prompt(row)
+        + "\n\nคำตอบก่อนหน้าผิด schema ให้ตอบใหม่เป็น JSON compact ที่ถูกต้องเท่านั้น:"
+        + "\n"
+        + raw
+    )
+    repaired = _generate_batch(
+        tokenizer,
+        model,
+        [prompt],
+        max_new_tokens=max_new_tokens,
+    )[0]
+    return _validate_compact_judgments(
+        _extract_json(repaired),
+        expected_words,
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Label routed V3.1 candidates locally with Qwen."
+        description="Label routed V3.1 candidates locally with batched compact Qwen output."
     )
     parser.add_argument(
         "--input",
@@ -320,13 +352,27 @@ def main() -> None:
         default="Qwen/Qwen3-4B-Instruct-2507",
     )
     parser.add_argument("--limit", type=int, default=0)
-    parser.add_argument("--max-new-tokens", type=int, default=1400)
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=4,
+        help="Number of dictionary senses generated together. Use 2 if GPU memory is tight.",
+    )
+    parser.add_argument(
+        "--max-new-tokens",
+        type=int,
+        default=320,
+        help="Compact output budget for <=8 candidates.",
+    )
     parser.add_argument(
         "--no-4bit",
         action="store_true",
         help="Load the local teacher without bitsandbytes 4-bit quantization.",
     )
     args = parser.parse_args()
+
+    if args.batch_size < 1:
+        raise SystemExit("--batch-size must be >= 1")
 
     rows = read_jsonl(args.input)
     if not rows:
@@ -355,49 +401,117 @@ def main() -> None:
         )
         return
 
-    needs_model = any(local_candidates(row) for row in pending)
+    rules_only = [row for row in pending if not local_candidates(row)]
+    llm_rows = [row for row in pending if local_candidates(row)]
+
+    for row in rules_only:
+        append_jsonl(args.output, _rules_only_row(row))
+
     tokenizer = model = None
-    if needs_model:
+    load_seconds = 0.0
+    if llm_rows:
+        load_start = time.perf_counter()
         tokenizer, model = _load_model(
             args.model,
             four_bit=not args.no_4bit,
         )
+        load_seconds = time.perf_counter() - load_start
 
-    success = 0
+    success = len(rules_only)
     failures = 0
-    for index, row in enumerate(pending, start=1):
+    repairs = 0
+    generation_start = time.perf_counter()
+
+    for start in range(0, len(llm_rows), args.batch_size):
+        batch = llm_rows[start : start + args.batch_size]
+        prompts = [_prompt(row) for row in batch]
+
         try:
-            labeled = _label_row(
-                row,
+            raws = _generate_batch(
                 tokenizer,
                 model,
-                model_id=args.model,
+                prompts,
                 max_new_tokens=args.max_new_tokens,
+            )
+        except RuntimeError as exc:
+            if "out of memory" in str(exc).lower():
+                raise RuntimeError(
+                    "CUDA out of memory during batched generation. "
+                    "Retry with --batch-size 2 or --batch-size 1."
+                ) from exc
+            raise
+
+        for offset, (row, raw) in enumerate(zip(batch, raws), start=1):
+            ordinal = start + offset
+            expected_words = [
+                candidate["word"] for candidate in local_candidates(row)
+            ]
+            try:
+                judgments = _validate_compact_judgments(
+                    _extract_json(raw),
+                    expected_words,
+                )
+            except Exception:
+                repairs += 1
+                try:
+                    judgments = _repair_one(
+                        row,
+                        raw,
+                        tokenizer,
+                        model,
+                        max_new_tokens=args.max_new_tokens,
+                    )
+                except Exception as exc:
+                    failures += 1
+                    print(
+                        f"[{ordinal}/{len(llm_rows)}] ERROR "
+                        f"{row.get('seed_id')}: {exc}",
+                        file=sys.stderr,
+                    )
+                    continue
+
+            labeled = _apply_judgments(
+                row,
+                judgments,
+                model_id=args.model,
             )
             append_jsonl(args.output, labeled)
             success += 1
             print(
-                f"[{index}/{len(pending)}] labeled {row.get('seed_id')} "
+                f"[{ordinal}/{len(llm_rows)}] labeled {row.get('seed_id')} "
                 f"({row['anchor']['word']})",
                 file=sys.stderr,
             )
-        except Exception as exc:
-            failures += 1
-            print(
-                f"[{index}/{len(pending)}] ERROR {row.get('seed_id')}: {exc}",
-                file=sys.stderr,
-            )
+
+    generation_seconds = time.perf_counter() - generation_start
+    llm_completed = max(0, success - len(rules_only))
+    senses_per_minute = (
+        (llm_completed / generation_seconds) * 60.0
+        if generation_seconds > 0
+        else None
+    )
 
     print(
         json.dumps(
             {
-                "version": "3.1",
+                "version": "3.1-compact-batch",
                 "model": args.model,
                 "four_bit": not args.no_4bit,
+                "batch_size": args.batch_size,
+                "max_new_tokens": args.max_new_tokens,
                 "selected": len(pending),
+                "rules_only": len(rules_only),
                 "successes": success,
                 "failures": failures,
+                "repair_attempts": repairs,
                 "resume_existing": len(completed),
+                "model_load_seconds": round(load_seconds, 2),
+                "generation_seconds": round(generation_seconds, 2),
+                "llm_senses_per_minute": (
+                    round(senses_per_minute, 3)
+                    if senses_per_minute is not None
+                    else None
+                ),
                 "output": args.output,
             },
             ensure_ascii=False,
