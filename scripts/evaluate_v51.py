@@ -79,7 +79,8 @@ def main() -> None:
     parser.add_argument("--dense-device", default=None)
     parser.add_argument("--ranker-device", default=None)
     parser.add_argument("--qwen-dtype", default=None)
-    parser.add_argument("--qwen-max-new-tokens", type=int, default=384)
+    parser.add_argument("--qwen-max-new-tokens", type=int, default=192)
+    parser.add_argument("--qwen-output-count", type=int, default=15)
     parser.add_argument("--v25-rank-weight", type=float, default=0.2)
     parser.add_argument("--listwise-rank-weight", type=float, default=1.0)
     parser.add_argument("--v5-rrf-k", type=int, default=20)
@@ -173,6 +174,7 @@ def main() -> None:
             device=ranker_device,
             qwen_dtype=args.qwen_dtype,
             qwen_max_new_tokens=args.qwen_max_new_tokens,
+            qwen_output_count=args.qwen_output_count,
         )
         model_load_seconds = perf_counter() - model_started
         _status(
@@ -240,6 +242,9 @@ def main() -> None:
                     "parsed_count": int(
                         getattr(ranker, "last_parsed_count", 0)
                     ),
+                    "requested_count": int(
+                        getattr(ranker, "last_requested_count", 0)
+                    ),
                     "raw_output": str(getattr(ranker, "last_output", "")),
                 }
 
@@ -269,8 +274,12 @@ def main() -> None:
                 )
                 _status(
                     f"{prefix} generation parse: {parse_label} "
-                    f"({generation['parse_strategy']})"
+                    f"({generation['parse_strategy']}) "
+                    f"{generation['parsed_count']}/{generation['requested_count']} IDs"
                 )
+                if not generation["parse_complete"]:
+                    preview = generation["raw_output"].replace("\n", " ")[:300]
+                    _status(f"{prefix} raw output preview: {preview!r}")
 
             _status("V2.5       : " + " | ".join(_words(baseline, args.top_k)))
             for mode in modes:
