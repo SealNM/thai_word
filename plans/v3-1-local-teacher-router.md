@@ -1,10 +1,12 @@
 # V3.1 — Local Teacher Router
 
-Status: **in progress**
+Status: **paused; superseded by V4 reranker research**
 
 Branch: `feat/dictionary-semantic-v3-1-local-teacher-router`
 
 Base: `feat/dictionary-semantic-v3-teacher-finetune`
+
+Successor: `plans/v4-instruction-aware-reranker.md` on `feat/dictionary-semantic-v4-instruction-reranker`
 
 V3.1 replaces the V3 Gemini-first labeling strategy while keeping the V3 compiler, fine-tuning, holdout, and evaluation design.
 
