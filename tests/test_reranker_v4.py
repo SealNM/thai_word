@@ -83,17 +83,32 @@ class V4RerankerTests(unittest.TestCase):
         self.assertIn("Thai query word: ฝน", text)
         self.assertIn("Intended dictionary sense:", text)
 
+    def test_writer_query_includes_category_context(self) -> None:
+        text = build_writer_query(
+            "บ้าน",
+            {"sense": 1, "definition": "ที่อยู่อาศัย"},
+            category="noun:place",
+        )
+        self.assertIn("Query category / grammatical role: noun:place", text)
+
     def test_candidate_document_uses_matched_definition(self) -> None:
         text = build_candidate_document(self.candidates[0])
         self.assertIn("Thai candidate word: พิรุณ", text)
         self.assertIn("Dictionary meaning: ฝน", text)
 
-    def test_v42_profile_keeps_strict_substitutability_prompt(self) -> None:
-        profile = resolve_reranker_profile("qwen3-0.6b-v4.2")
-        instruction = str(profile["instruction"])
+    def test_v43_profiles_keep_strict_prompt_and_expected_sizes(self) -> None:
+        small = resolve_reranker_profile("qwen3-0.6b-v4.3")
+        large = resolve_reranker_profile("qwen3-4b-v4.3")
+
+        instruction = str(small["instruction"])
         self.assertIn("lexical substitutability", instruction)
         self.assertIn("commonly used Thai words", instruction)
         self.assertIn("grammatical role", instruction)
+        self.assertEqual(small["model_id"], "Qwen/Qwen3-Reranker-0.6B")
+        self.assertEqual(small["default_batch_size"], 16)
+        self.assertEqual(large["model_id"], "Qwen/Qwen3-Reranker-4B")
+        self.assertEqual(large["default_batch_size"], 4)
+        self.assertEqual(large["model_kwargs"]["torch_dtype"], "float16")
 
     def test_only_narrow_tier_five_evidence_is_protected(self) -> None:
         self.assertTrue(is_high_precision_lexical(self.candidates[0]))
@@ -108,12 +123,18 @@ class V4RerankerTests(unittest.TestCase):
 
     def test_rerank_mode_follows_model_scores(self) -> None:
         scorer = _FakeScorer([0.4, 0.9, 0.8])
-        scored = annotate_reranker_scores("ฝน", self.candidates, scorer)
+        scored = annotate_reranker_scores(
+            "ฝน",
+            self.candidates,
+            scorer,
+            category="noun:nature",
+        )
         results = rank_v4_candidates(scored, mode="rerank", top_k=3)
 
         self.assertEqual([item["word"] for item in results], ["พลาหก", "เมฆ", "พิรุณ"])
         self.assertEqual(results[0]["reranker_rank"], 1)
         self.assertIn("ฝน", scorer.last_query or "")
+        self.assertIn("noun:nature", scorer.last_query or "")
         self.assertEqual(len(scorer.last_documents or []), 3)
 
     def test_protected_mode_keeps_safe_direct_synonym_first(self) -> None:
