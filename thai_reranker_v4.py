@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Any, Callable, Protocol
 
 import numpy as np
 
@@ -44,6 +45,10 @@ RERANKER_PROFILES: dict[str, dict[str, Any]] = {
         "model_id": DEFAULT_QWEN_RERANKER,
         "instruction": WRITER_RERANK_INSTRUCTION_V41,
     },
+    "qwen3-0.6b-v4.2": {
+        "model_id": DEFAULT_QWEN_RERANKER,
+        "instruction": WRITER_RERANK_INSTRUCTION_V41,
+    },
     "bge-v2-m3": {
         "model_id": DEFAULT_BGE_RERANKER,
         "instruction": None,
@@ -55,7 +60,13 @@ SAFE_RELATION_HINTS = {
     "mutual_definition_reference",
 }
 
-VALID_MODES = {"rerank", "fusion", "protected", "commonness"}
+VALID_MODES = {
+    "rerank",
+    "fusion",
+    "protected",
+    "commonness",
+    "gated-commonness",
+}
 
 
 class PairScorer(Protocol):
@@ -119,12 +130,11 @@ def is_high_precision_lexical(candidate: dict[str, Any]) -> bool:
 
 
 def load_tnc_commonness() -> dict[str, int]:
-    """Load Thai unigram counts from the Thai National Corpus via PyThaiNLP."""
     try:
         from pythainlp.corpus.tnc import unigram_word_freqs
     except ImportError as exc:
         raise RuntimeError(
-            "PyThaiNLP TNC frequency data is required for V4.1 commonness ranking."
+            "PyThaiNLP TNC frequency data is required for V4 commonness ranking."
         ) from exc
 
     values = unigram_word_freqs()
@@ -142,36 +152,130 @@ def load_tnc_commonness() -> dict[str, int]:
     return result
 
 
+def _default_commonness_tokenizer(text: str) -> list[str]:
+    try:
+        from pythainlp.tokenize import word_tokenize
+    except ImportError:
+        return [text] if text else []
+
+    tokens = word_tokenize(text, engine="newmm", keep_whitespace=False)
+    return [normalize_text(token) for token in tokens if normalize_text(token)]
+
+
+def _commonness_features(
+    word: str,
+    frequency: dict[str, int],
+    tokenizer: Callable[[str], list[str]],
+) -> tuple[int, list[str], list[int], float]:
+    word = normalize_text(word)
+    try:
+        exact_count = max(0, int(frequency.get(word, 0)))
+    except (TypeError, ValueError):
+        exact_count = 0
+
+    tokens = tokenizer(word)
+    if not tokens:
+        tokens = [word] if word else []
+
+    token_counts: list[int] = []
+    for token in tokens:
+        try:
+            token_counts.append(max(0, int(frequency.get(token, 0))))
+        except (TypeError, ValueError):
+            token_counts.append(0)
+
+    exact_log = math.log1p(exact_count)
+    token_logs = [math.log1p(count) for count in token_counts if count > 0]
+    token_average = sum(token_logs) / len(token_logs) if token_logs else 0.0
+
+    if len(tokens) <= 1:
+        familiarity = exact_log
+    else:
+        familiarity = max(
+            exact_log,
+            (0.55 * exact_log) + (0.45 * token_average),
+        )
+
+    return exact_count, tokens, token_counts, float(familiarity)
+
+
 def annotate_commonness(
     candidates: list[dict[str, Any]],
     frequency: dict[str, int] | None,
     *,
     source: str = "tnc",
+    tokenizer: Callable[[str], list[str]] | None = None,
 ) -> list[dict[str, Any]]:
     if not candidates:
         return []
 
     frequency = frequency or {}
-    counts: list[int] = []
-    for item in candidates:
-        word = normalize_text(item.get("word", ""))
-        try:
-            count = max(0, int(frequency.get(word, 0)))
-        except (TypeError, ValueError):
-            count = 0
-        counts.append(count)
+    tokenizer = tokenizer or _default_commonness_tokenizer
 
-    ranked_counts = sorted({count for count in counts if count > 0}, reverse=True)
-    rank_by_count = {count: rank for rank, count in enumerate(ranked_counts, start=1)}
+    features = [
+        _commonness_features(
+            normalize_text(item.get("word", "")),
+            frequency,
+            tokenizer,
+        )
+        for item in candidates
+    ]
+
+    positive_scores = sorted(
+        {round(feature[3], 12) for feature in features if feature[3] > 0.0},
+        reverse=True,
+    )
+    rank_by_score = {
+        score: rank
+        for rank, score in enumerate(positive_scores, start=1)
+    }
 
     annotated: list[dict[str, Any]] = []
-    for candidate, count in zip(candidates, counts, strict=True):
+    for candidate, feature in zip(candidates, features, strict=True):
+        exact_count, tokens, token_counts, familiarity = feature
         item = dict(candidate)
         item["commonness_source"] = source
-        item["commonness_count"] = count
-        item["commonness_rank"] = rank_by_count.get(count) if count > 0 else None
+        item["commonness_count"] = exact_count
+        item["commonness_tokens"] = tokens
+        item["commonness_token_counts"] = token_counts
+        item["commonness_score"] = round(familiarity, 8)
+        item["commonness_rank"] = (
+            rank_by_score.get(round(familiarity, 12))
+            if familiarity > 0.0
+            else None
+        )
         annotated.append(item)
     return annotated
+
+
+def semantic_commonness_eligible(
+    candidate: dict[str, Any],
+    *,
+    lexical_tier: int = 4,
+    reranker_top: int = 12,
+    v25_top: int = 20,
+    strict_reranker_top: int = 5,
+    wide_v25_top: int = 30,
+) -> bool:
+    try:
+        relation_tier = int(candidate.get("relation_tier") or 0)
+    except (TypeError, ValueError):
+        relation_tier = 0
+    lexical_form = str(candidate.get("lexical_form") or "standalone")
+    if relation_tier >= lexical_tier and lexical_form == "standalone":
+        return True
+
+    try:
+        reranker_rank = int(candidate["reranker_rank"])
+        v25_rank = int(candidate["v25_rank"])
+    except (KeyError, TypeError, ValueError):
+        return False
+
+    if reranker_rank <= reranker_top and v25_rank <= v25_top:
+        return True
+    if reranker_rank <= strict_reranker_top and v25_rank <= wide_v25_top:
+        return True
+    return False
 
 
 class CrossEncoderPairScorer:
@@ -279,15 +383,164 @@ def annotate_reranker_scores(
     return annotated
 
 
+def _fusion_score(
+    item: dict[str, Any],
+    *,
+    v25_weight: float,
+    reranker_weight: float,
+    rrf_k: int,
+) -> float:
+    return weighted_rrf(
+        lexical_rank=int(item["v25_rank"]),
+        dense_rank=int(item["reranker_rank"]),
+        lexical_weight=v25_weight,
+        dense_weight=reranker_weight,
+        k=rrf_k,
+    )
+
+
+def _fusion_sorted(
+    candidates: list[dict[str, Any]],
+    *,
+    v25_weight: float,
+    reranker_weight: float,
+    rrf_k: int,
+) -> list[dict[str, Any]]:
+    ranked: list[dict[str, Any]] = []
+    for candidate in candidates:
+        item = dict(candidate)
+        item["fusion_score"] = float(
+            _fusion_score(
+                item,
+                v25_weight=v25_weight,
+                reranker_weight=reranker_weight,
+                rrf_k=rrf_k,
+            )
+        )
+        ranked.append(item)
+    ranked.sort(
+        key=lambda item: (
+            -float(item["fusion_score"]),
+            int(item["reranker_rank"]),
+            int(item["v25_rank"]),
+            item["word"],
+        )
+    )
+    for rank, item in enumerate(ranked, start=1):
+        item["fusion_rank"] = rank
+    return ranked
+
+
+def _rank_gated_commonness(
+    candidates: list[dict[str, Any]],
+    *,
+    top_k: int,
+    v25_weight: float,
+    reranker_weight: float,
+    commonness_weight: float,
+    commonness_promotion_cap: int,
+    rrf_k: int,
+    gate_lexical_tier: int,
+    gate_reranker_top: int,
+    gate_v25_top: int,
+    gate_strict_reranker_top: int,
+    gate_wide_v25_top: int,
+) -> list[dict[str, Any]]:
+    baseline = _fusion_sorted(
+        candidates,
+        v25_weight=v25_weight,
+        reranker_weight=reranker_weight,
+        rrf_k=rrf_k,
+    )
+
+    eligible_scores = sorted(
+        {
+            round(float(item.get("commonness_score") or 0.0), 12)
+            for item in baseline
+            if float(item.get("commonness_score") or 0.0) > 0.0
+            and semantic_commonness_eligible(
+                item,
+                lexical_tier=gate_lexical_tier,
+                reranker_top=gate_reranker_top,
+                v25_top=gate_v25_top,
+                strict_reranker_top=gate_strict_reranker_top,
+                wide_v25_top=gate_wide_v25_top,
+            )
+        },
+        reverse=True,
+    )
+    eligible_rank = {
+        score: rank
+        for rank, score in enumerate(eligible_scores, start=1)
+    }
+    eligible_count = len(eligible_scores)
+
+    ranked: list[dict[str, Any]] = []
+    cap = max(0, int(commonness_promotion_cap))
+    for item in baseline:
+        row = dict(item)
+        eligible = semantic_commonness_eligible(
+            row,
+            lexical_tier=gate_lexical_tier,
+            reranker_top=gate_reranker_top,
+            v25_top=gate_v25_top,
+            strict_reranker_top=gate_strict_reranker_top,
+            wide_v25_top=gate_wide_v25_top,
+        )
+        familiarity = float(row.get("commonness_score") or 0.0)
+        common_rank = (
+            eligible_rank.get(round(familiarity, 12))
+            if eligible and familiarity > 0.0
+            else None
+        )
+
+        promotion = 0
+        if common_rank is not None and eligible_count > 0 and cap > 0:
+            percentile = (eligible_count - common_rank + 1) / eligible_count
+            promotion = min(
+                cap,
+                max(0, int(round(commonness_weight * cap * percentile))),
+            )
+
+        row["semantic_gate_eligible"] = eligible
+        row["gated_commonness_rank"] = common_rank
+        row["commonness_promotion"] = promotion
+        row["adjusted_fusion_rank"] = max(1, int(row["fusion_rank"]) - promotion)
+        row["v4_mode"] = "gated-commonness"
+        row["v4_score"] = 1.0 / float(row["adjusted_fusion_rank"])
+        row["score"] = row["v4_score"]
+        ranked.append(row)
+
+    ranked.sort(
+        key=lambda item: (
+            int(item["adjusted_fusion_rank"]),
+            int(item["fusion_rank"]),
+            int(item["reranker_rank"]),
+            int(item["v25_rank"]),
+            item["word"],
+        )
+    )
+
+    for rank, item in enumerate(ranked, start=1):
+        item["v4_rank"] = rank
+    return ranked[:top_k]
+
+
 def rank_v4_candidates(
     candidates: list[dict[str, Any]],
     *,
-    mode: str = "commonness",
+    mode: str = "gated-commonness",
     top_k: int = 20,
     v25_weight: float = 0.35,
     reranker_weight: float = 1.0,
     commonness_weight: float = 0.5,
+    commonness_promotion_cap: int = 4,
     rrf_k: int = 20,
+    gate_lexical_tier: int = 4,
+    gate_reranker_top: int = 12,
+    gate_v25_top: int = 20,
+    gate_strict_reranker_top: int = 5,
+    gate_wide_v25_top: int = 30,
 ) -> list[dict[str, Any]]:
     if mode not in VALID_MODES:
         raise ValueError(
@@ -295,6 +548,22 @@ def rank_v4_candidates(
         )
     if top_k <= 0:
         return []
+
+    if mode == "gated-commonness":
+        return _rank_gated_commonness(
+            candidates,
+            top_k=top_k,
+            v25_weight=v25_weight,
+            reranker_weight=reranker_weight,
+            commonness_weight=commonness_weight,
+            commonness_promotion_cap=commonness_promotion_cap,
+            rrf_k=rrf_k,
+            gate_lexical_tier=gate_lexical_tier,
+            gate_reranker_top=gate_reranker_top,
+            gate_v25_top=gate_v25_top,
+            gate_strict_reranker_top=gate_strict_reranker_top,
+            gate_wide_v25_top=gate_wide_v25_top,
+        )
 
     ranked: list[dict[str, Any]] = []
     for candidate in candidates:
@@ -400,7 +669,7 @@ class V4Searcher:
         top_k: int = 20,
         sense: int | None = None,
         candidate_pool: int = 50,
-        mode: str = "commonness",
+        mode: str = "gated-commonness",
         lexical_pool: int = 300,
         dense_pool: int = 300,
         lexical_weight: float = 1.0,
@@ -408,7 +677,8 @@ class V4Searcher:
         v25_rrf_k: int = 60,
         v25_rank_weight: float = 0.35,
         reranker_rank_weight: float = 1.0,
-        commonness_rank_weight: float = 0.5,
+        commonness_rank_weight: float = 0.75,
+        commonness_promotion_cap: int = 4,
         v4_rrf_k: int = 20,
     ) -> list[dict[str, Any]]:
         scored = self.retrieve_and_score(
@@ -428,5 +698,6 @@ class V4Searcher:
             v25_weight=v25_rank_weight,
             reranker_weight=reranker_rank_weight,
             commonness_weight=commonness_rank_weight,
+            commonness_promotion_cap=commonness_promotion_cap,
             rrf_k=v4_rrf_k,
         )
