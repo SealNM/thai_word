@@ -50,6 +50,7 @@ def main() -> None:
 
     try:
         import torch
+        from huggingface_hub import get_token
         from datasets import load_dataset
         from sentence_transformers import (
             SentenceTransformer,
@@ -91,7 +92,18 @@ def main() -> None:
         train_dataset = split["train"]
         eval_dataset = split["test"]
 
-    model = SentenceTransformer(args.base_model)
+    hf_token = get_token()
+    if (
+        args.base_model.startswith("google/embeddinggemma")
+        and not Path(args.base_model).exists()
+        and not hf_token
+    ):
+        raise SystemExit(
+            "EmbeddingGemma is gated and this runtime is not authenticated. "
+            "Load HF_TOKEN or call huggingface_hub.login() before training."
+        )
+
+    model = SentenceTransformer(args.base_model, token=hf_token)
 
     base_loss = CachedMultipleNegativesRankingLoss(
         model,
