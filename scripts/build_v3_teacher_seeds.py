@@ -39,6 +39,7 @@ def _candidate_from_result(item: dict[str, Any]) -> dict[str, Any]:
             "relation_tier": item.get("relation_tier"),
             "relation_hint": item.get("relation_hint"),
             "lexical_form": item.get("lexical_form"),
+            "sense_resolution": item.get("sense_resolution"),
             "lexical_score": item.get("lexical_score"),
             "lexical_rank": item.get("lexical_rank"),
             "dense_similarity": item.get("dense_similarity"),
