@@ -1,6 +1,6 @@
 # V5 — Listwise Lexical Ranking
 
-Status: **Jina v3.5 pilot complete; V5.1 Qwen3.5 generative-listwise comparison implemented, real-model pilot pending**
+Status: **V5.1 first run diagnosed; short-form Qwen generative ranking fix implemented, rerun pending**
 
 Branch: `feat/dictionary-semantic-v5-listwise-ranker`
 
@@ -271,3 +271,53 @@ python -u scripts/evaluate_v51.py \
 ```
 
 If Qwen3.5 fails to load because the installed Transformers build is too old, upgrade Transformers first and restart the Colab runtime before rerunning the comparison.
+
+
+## V5.1 first shared-top-50 run — diagnosis
+
+Observed runtime:
+- Jina v3.5: ~3.13s/query.
+- Qwen3.5-0.8B: ~13.80s/query.
+- Qwen model load: ~36s.
+
+Critical finding:
+- Every Qwen query reported `generation parse: recovered (json)`.
+- Every final Qwen top-10 exactly matched the V2.5 baseline.
+- Therefore this run does **not** measure Qwen3.5 ranking quality. The generative ranker failed to provide enough explicit candidate IDs and the fallback path filled the missing IDs in original V2.5 order.
+
+The previous output contract asked the 0.8B model to emit a complete permutation of all 50 candidates. That is unnecessary for a top-10 product result and adds output latency / format pressure.
+
+### V5.1 short-form ranking fix
+
+Implemented:
+- [x] Ask Qwen for only the best 15 candidate IDs from the shared top-50 pool.
+- [x] Keep all 50 candidates in the prompt so global comparison is unchanged.
+- [x] Append unranked candidates in original V2.5 order only after the explicit Qwen top-15, preserving compatibility with the V5 ranking interface.
+- [x] Reduce default generation budget from 384 to 192 tokens.
+- [x] Stop greedy decoding; use conservative non-thinking sampling for the Qwen3.5 instruction model.
+- [x] Make the parser choose the largest valid JSON array rather than the first bracket pair.
+- [x] Recover ordered singleton labels such as `[7] [3] [12]` when small-model formatting drifts.
+- [x] Keep numeric recovery as a final diagnostic fallback.
+- [x] Track explicit parsed ID count separately from the fallback-completed permutation.
+- [x] Evaluator prints `parsed/requested IDs`.
+- [x] Evaluator prints a raw generation preview whenever recovery is still required.
+- [x] Add tests for largest-array selection and singleton-label recovery.
+- [ ] Rerun Qwen3.5-0.8B only first; do not rerun Jina unnecessarily.
+- [ ] Require at least 10/15 explicit IDs on most queries before judging Qwen ranking quality.
+- [ ] If explicit output is still poor, stop generative 0.8B and move to an instruction-trained reranker rather than increasing output length again.
+
+Recommended focused rerun:
+
+```bash
+python -u scripts/evaluate_v51.py \
+  --dense-index artifacts/v2/embeddinggemma-300m-256 \
+  --candidate-pool 50 \
+  --top-k 10 \
+  --device cuda \
+  --ranker qwen3.5-0.8b \
+  --qwen-output-count 15 \
+  --qwen-max-new-tokens 192 \
+  --mode listwise \
+  --mode fusion \
+  --output artifacts/v5/qwen35-short15-rerun.json
+```
