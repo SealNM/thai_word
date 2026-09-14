@@ -1,6 +1,6 @@
 # V4 — V2.5 Candidate Retrieval + Instruction-Aware Reranking
 
-Status: **V4.2 pilot complete; V4.3 category-aware 0.6B vs 4B comparison implemented, real-model rerun pending**
+Status: **V4.3 pilot complete; superseded by V5 listwise lexical-ranking experiment**
 
 Branch: `feat/dictionary-semantic-v4-instruction-reranker`
 
@@ -449,3 +449,14 @@ python scripts/evaluate_v4.py \
   --ignore-category \
   --output artifacts/v4/qwen3-v4.3-no-category-control.json
 ```
+
+
+## Successor direction
+
+V4.3 completed the 0.6B vs 4B pointwise reranker comparison. The 4B model improved several lexical cases but remained slow and still produced semantic-neighbor errors such as walking vs running and common-vs-literary ordering failures.
+
+Active successor:
+
+- Plan: `plans/v5-listwise-lexical-ranking.md`
+- Branch: `feat/dictionary-semantic-v5-listwise-ranker`
+- Direction: jointly rank the V2.5 candidate set with a small multilingual listwise model before adding any further commonness heuristic.
