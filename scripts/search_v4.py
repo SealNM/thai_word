@@ -13,13 +13,14 @@ from thai_lexical_v1 import list_senses, load_artifacts
 from thai_reranker_v4 import (
     CrossEncoderPairScorer,
     V4Searcher,
+    load_tnc_commonness,
     resolve_reranker_profile,
 )
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Search Thai Words V4: V2.5 retrieval + instruction-aware reranking."
+        description="Search Thai Words V4.1: V2.5 + strict reranking + commonness."
     )
     parser.add_argument("query", help="Thai headword or phrase.")
     parser.add_argument("--index", default="artifacts/v1")
@@ -29,13 +30,13 @@ def main() -> None:
     parser.add_argument("--candidate-pool", type=int, default=50)
     parser.add_argument(
         "--mode",
-        choices=["rerank", "fusion", "protected"],
-        default="protected",
+        choices=["rerank", "fusion", "protected", "commonness"],
+        default="commonness",
     )
     parser.add_argument(
         "--reranker",
-        default="qwen3-0.6b",
-        help="Profile name (qwen3-0.6b, bge-v2-m3) or Hugging Face model id.",
+        default="qwen3-0.6b-v4.1",
+        help="Profile name (qwen3-0.6b-v4.1, qwen3-0.6b, bge-v2-m3) or model id.",
     )
     parser.add_argument("--instruction", default=None)
     parser.add_argument("--no-instruction", action="store_true")
@@ -51,6 +52,8 @@ def main() -> None:
     parser.add_argument("--v25-rrf-k", type=int, default=60)
     parser.add_argument("--v25-rank-weight", type=float, default=0.35)
     parser.add_argument("--reranker-rank-weight", type=float, default=1.0)
+    parser.add_argument("--commonness-source", choices=["none", "tnc"], default="tnc")
+    parser.add_argument("--commonness-rank-weight", type=float, default=0.5)
     parser.add_argument("--v4-rrf-k", type=int, default=20)
     parser.add_argument("--list-senses", action="store_true")
     args = parser.parse_args()
@@ -76,6 +79,10 @@ def main() -> None:
     if args.no_instruction:
         instruction = None
 
+    commonness = None
+    if args.commonness_source == "tnc":
+        commonness = load_tnc_commonness()
+
     scorer = CrossEncoderPairScorer(
         str(profile["model_id"]),
         instruction=instruction,
@@ -83,7 +90,12 @@ def main() -> None:
         batch_size=args.reranker_batch_size,
         max_length=args.max_length,
     )
-    searcher = V4Searcher(v25=v25, scorer=scorer)
+    searcher = V4Searcher(
+        v25=v25,
+        scorer=scorer,
+        commonness=commonness,
+        commonness_source=args.commonness_source,
+    )
 
     results = searcher.search(
         args.query,
@@ -98,6 +110,7 @@ def main() -> None:
         v25_rrf_k=args.v25_rrf_k,
         v25_rank_weight=args.v25_rank_weight,
         reranker_rank_weight=args.reranker_rank_weight,
+        commonness_rank_weight=args.commonness_rank_weight,
         v4_rrf_k=args.v4_rrf_k,
     )
     print(json.dumps(results, ensure_ascii=False, indent=2))
