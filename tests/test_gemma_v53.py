@@ -14,7 +14,7 @@ class V53GemmaTests(unittest.TestCase):
         self.assertIn("Preserve the intended dictionary sense", GEMMA4_SYSTEM_PROMPT)
         self.assertIn("grammatical role", GEMMA4_SYSTEM_PROMPT)
         self.assertIn("common contemporary Thai", GEMMA4_SYSTEM_PROMPT)
-        self.assertIn("equally valid substitutes", GEMMA4_SYSTEM_PROMPT)
+        self.assertIn("equally valid substitutes", GEMMA4_SYSTEM_PROMPT)\n        self.assertIn("HARD lexical-validity gate", GEMMA4_SYSTEM_PROMPT)\n        self.assertIn("merely associated", GEMMA4_SYSTEM_PROMPT)\n        self.assertIn("different parts of speech", GEMMA4_SYSTEM_PROMPT)
 
     def test_prompt_requests_only_top_k_ids(self) -> None:
         candidates = [
