@@ -11,6 +11,7 @@ from thai_lexical_v1 import normalize_text
 
 
 DEFAULT_QWEN_RERANKER = "Qwen/Qwen3-Reranker-0.6B"
+DEFAULT_QWEN_RERANKER_4B = "Qwen/Qwen3-Reranker-4B"
 DEFAULT_BGE_RERANKER = "BAAI/bge-reranker-v2-m3"
 
 WRITER_RERANK_INSTRUCTION = (
@@ -48,6 +49,17 @@ RERANKER_PROFILES: dict[str, dict[str, Any]] = {
     "qwen3-0.6b-v4.2": {
         "model_id": DEFAULT_QWEN_RERANKER,
         "instruction": WRITER_RERANK_INSTRUCTION_V41,
+    },
+    "qwen3-0.6b-v4.3": {
+        "model_id": DEFAULT_QWEN_RERANKER,
+        "instruction": WRITER_RERANK_INSTRUCTION_V41,
+        "default_batch_size": 16,
+    },
+    "qwen3-4b-v4.3": {
+        "model_id": DEFAULT_QWEN_RERANKER_4B,
+        "instruction": WRITER_RERANK_INSTRUCTION_V41,
+        "default_batch_size": 4,
+        "model_kwargs": {"torch_dtype": "auto"},
     },
     "bge-v2-m3": {
         "model_id": DEFAULT_BGE_RERANKER,
@@ -89,9 +101,14 @@ def resolve_reranker_profile(name_or_model: str) -> dict[str, Any]:
 def build_writer_query(
     query: str,
     query_sense: dict[str, Any] | None,
+    *,
+    category: str | None = None,
 ) -> str:
     query = normalize_text(query)
     lines = [f"Thai query word: {query}"]
+    category = str(category or "").strip()
+    if category:
+        lines.append(f"Query category / grammatical role: {category}")
     if isinstance(query_sense, dict):
         definition = normalize_text(query_sense.get("definition", ""))
         if definition:
@@ -287,6 +304,7 @@ class CrossEncoderPairScorer:
         device: str | None = None,
         batch_size: int = 16,
         max_length: int | None = None,
+        model_kwargs: dict[str, Any] | None = None,
     ) -> None:
         try:
             from sentence_transformers import CrossEncoder
@@ -301,6 +319,8 @@ class CrossEncoderPairScorer:
             kwargs["device"] = device
         if max_length is not None:
             kwargs["max_length"] = int(max_length)
+        if model_kwargs:
+            kwargs["model_kwargs"] = dict(model_kwargs)
 
         self.model_id = model_id
         self.instruction = instruction
@@ -340,6 +360,8 @@ def annotate_reranker_scores(
     query: str,
     candidates: list[dict[str, Any]],
     scorer: PairScorer,
+    *,
+    category: str | None = None,
 ) -> list[dict[str, Any]]:
     if not candidates:
         return []
@@ -348,7 +370,7 @@ def annotate_reranker_scores(
     if not isinstance(query_sense, dict):
         query_sense = None
 
-    query_text = build_writer_query(query, query_sense)
+    query_text = build_writer_query(query, query_sense, category=category)
     documents = [build_candidate_document(item) for item in candidates]
     scores = scorer.score(query_text, documents)
 
@@ -637,6 +659,7 @@ class V4Searcher:
         query: str,
         *,
         sense: int | None = None,
+        category: str | None = None,
         candidate_pool: int = 50,
         lexical_pool: int = 300,
         dense_pool: int = 300,
@@ -655,7 +678,12 @@ class V4Searcher:
             dense_weight=dense_weight,
             rrf_k=v25_rrf_k,
         )
-        scored = annotate_reranker_scores(query, candidates, self.scorer)
+        scored = annotate_reranker_scores(
+            query,
+            candidates,
+            self.scorer,
+            category=category,
+        )
         return annotate_commonness(
             scored,
             self.commonness,
@@ -668,6 +696,7 @@ class V4Searcher:
         *,
         top_k: int = 20,
         sense: int | None = None,
+        category: str | None = None,
         candidate_pool: int = 50,
         mode: str = "gated-commonness",
         lexical_pool: int = 300,
@@ -684,6 +713,7 @@ class V4Searcher:
         scored = self.retrieve_and_score(
             query,
             sense=sense,
+            category=category,
             candidate_pool=max(top_k, candidate_pool),
             lexical_pool=lexical_pool,
             dense_pool=dense_pool,
