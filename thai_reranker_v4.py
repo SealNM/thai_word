@@ -59,7 +59,7 @@ RERANKER_PROFILES: dict[str, dict[str, Any]] = {
         "model_id": DEFAULT_QWEN_RERANKER_4B,
         "instruction": WRITER_RERANK_INSTRUCTION_V41,
         "default_batch_size": 4,
-        "model_kwargs": {"torch_dtype": "auto"},
+        "model_kwargs": {"torch_dtype": "float16"},
     },
     "bge-v2-m3": {
         "model_id": DEFAULT_BGE_RERANKER,
@@ -320,7 +320,13 @@ class CrossEncoderPairScorer:
         if max_length is not None:
             kwargs["max_length"] = int(max_length)
         if model_kwargs:
-            kwargs["model_kwargs"] = dict(model_kwargs)
+            resolved_model_kwargs = dict(model_kwargs)
+            dtype_name = resolved_model_kwargs.get("torch_dtype")
+            if dtype_name in {"float16", "bfloat16", "float32"}:
+                import torch
+
+                resolved_model_kwargs["torch_dtype"] = getattr(torch, str(dtype_name))
+            kwargs["model_kwargs"] = resolved_model_kwargs
 
         self.model_id = model_id
         self.instruction = instruction
