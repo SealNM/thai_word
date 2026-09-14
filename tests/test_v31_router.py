@@ -20,12 +20,16 @@ def _candidate(
     dense_rank: int,
     lexical_rank: int | None,
     lexical_form: str = "standalone",
+    relation_hint: str | None = None,
 ) -> dict:
+    if relation_hint is None:
+        relation_hint = "direct_gloss_or_synonym" if tier >= 5 else "definition_similar"
     return {
         "word": word,
         "definition": f"นิยามของ {word}",
         "evidence": {
             "relation_tier": tier,
+            "relation_hint": relation_hint,
             "lexical_form": lexical_form,
             "dense_rank": dense_rank,
             "lexical_rank": lexical_rank,
