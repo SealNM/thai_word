@@ -97,3 +97,13 @@ Before scaling beyond the first 100 senses:
 - EmbeddingGemma fine-tuning: local GPU.
 
 This keeps Gemini calls to a small fraction of the original V3 plan.
+
+
+## Pilot status
+
+- [x] 100 V3 seeds routed successfully.
+- [x] 2,400 source candidates reduced to 800 local judgments + 3 safe auto-labels.
+- [x] First 10 Qwen local tasks completed: 10/10 success, 0 failures.
+- [ ] Inspect relation quality/distribution for the 10-task smoke sample.
+- [ ] Complete 100-task local pilot if quality is acceptable.
+- [ ] Build Gemini audit subset and compare disagreement patterns.
