@@ -36,6 +36,8 @@ V3 must not train on the evaluation holdout.
 
 ## Phase B — Build grounded teacher seeds
 
+Implementation: **done** (`scripts/build_v3_teacher_seeds.py`); data generation: **pending Colab smoke run**.
+
 Input:
 - `artifacts/v1`
 - a V2.5 EmbeddingGemma dense index
@@ -51,6 +53,8 @@ Output:
 - `artifacts/v3/teacher_seeds.jsonl`
 
 ## Phase C — Teacher relation labeling
+
+Implementation: **done** (`scripts/generate_v3_teacher_labels.py`); teacher calls: **pending**.
 
 Default teacher path:
 - Gemini structured output.
@@ -71,6 +75,8 @@ Each candidate label records:
 - short reason
 
 ## Phase D — Validate and compile training data
+
+Implementation: **done** (`thai_v3_data.py`, `scripts/compile_v3_training_data.py`); validation against real teacher output: **pending**.
 
 Validation:
 - schema
@@ -93,6 +99,8 @@ Outputs:
 
 ## Phase E — Fine-tune EmbeddingGemma
 
+Implementation: **done** (`scripts/train_v3_embeddinggemma.py`); training run: **pending**.
+
 Training:
 - base: `google/embeddinggemma-300m`
 - Sentence Transformers
@@ -107,6 +115,8 @@ Training:
 The first V3 run is a conservative full fine-tune. If Colab T4 memory/runtime is not practical, add a PEFT experiment as a separate variant rather than silently changing the baseline.
 
 ## Phase F — Evaluate
+
+Indexing support: **done** via `scripts/build_dense_index.py --native-retrieval [--truncate-dim 256]`; trained-model benchmark: **pending**.
 
 Build a dense index using the trained model, then compare:
 - V1 lexical
