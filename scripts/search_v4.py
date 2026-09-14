@@ -20,13 +20,18 @@ from thai_reranker_v4 import (
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Search Thai Words V4.2: semantic-gated commonness reranking."
+        description="Search Thai Words V4.3: category-aware lexical reranking."
     )
     parser.add_argument("query", help="Thai headword or phrase.")
     parser.add_argument("--index", default="artifacts/v1")
     parser.add_argument("--dense-index", required=True)
     parser.add_argument("--top-k", type=int, default=20)
     parser.add_argument("--sense", type=int, default=None)
+    parser.add_argument(
+        "--category",
+        default=None,
+        help="Optional coarse query category / grammatical role, e.g. noun:place.",
+    )
     parser.add_argument("--candidate-pool", type=int, default=50)
     parser.add_argument(
         "--mode",
@@ -37,16 +42,16 @@ def main() -> None:
             "commonness",
             "gated-commonness",
         ],
-        default="gated-commonness",
+        default="fusion",
     )
     parser.add_argument(
         "--reranker",
-        default="qwen3-0.6b-v4.2",
-        help="Profile name (qwen3-0.6b-v4.2, qwen3-0.6b-v4.1, qwen3-0.6b, bge-v2-m3) or model id.",
+        default="qwen3-0.6b-v4.3",
+        help="Profile name (qwen3-0.6b-v4.3, qwen3-4b-v4.3, older V4 profiles, or model id).",
     )
     parser.add_argument("--instruction", default=None)
     parser.add_argument("--no-instruction", action="store_true")
-    parser.add_argument("--reranker-batch-size", type=int, default=16)
+    parser.add_argument("--reranker-batch-size", type=int, default=None)
     parser.add_argument("--max-length", type=int, default=None)
     parser.add_argument("--device", default=None, help="Default device for both models.")
     parser.add_argument("--dense-device", default=None)
@@ -90,12 +95,18 @@ def main() -> None:
     if args.commonness_source == "tnc":
         commonness = load_tnc_commonness()
 
+    batch_size = (
+        args.reranker_batch_size
+        if args.reranker_batch_size is not None
+        else int(profile.get("default_batch_size", 16))
+    )
     scorer = CrossEncoderPairScorer(
         str(profile["model_id"]),
         instruction=instruction,
         device=reranker_device,
-        batch_size=args.reranker_batch_size,
+        batch_size=batch_size,
         max_length=args.max_length,
+        model_kwargs=profile.get("model_kwargs"),
     )
     searcher = V4Searcher(
         v25=v25,
@@ -108,6 +119,7 @@ def main() -> None:
         args.query,
         top_k=args.top_k,
         sense=args.sense,
+        category=args.category,
         candidate_pool=args.candidate_pool,
         mode=args.mode,
         lexical_pool=args.lexical_pool,
