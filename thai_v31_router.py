@@ -28,8 +28,14 @@ def auto_judgment(candidate: dict[str, Any]) -> dict[str, Any] | None:
     evidence = _evidence(candidate)
     relation_tier = int(evidence.get("relation_tier") or 0)
     lexical_form = str(evidence.get("lexical_form") or "standalone")
+    relation_hint = str(evidence.get("relation_hint") or "")
+    safe_hints = {"direct_gloss_or_synonym", "mutual_definition_reference"}
 
-    if relation_tier >= 5 and lexical_form == "standalone":
+    if (
+        relation_tier >= 5
+        and lexical_form == "standalone"
+        and relation_hint in safe_hints
+    ):
         return {
             "relation": "synonym",
             "semantic_relatedness": 4,
