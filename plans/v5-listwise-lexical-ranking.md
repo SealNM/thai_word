@@ -1,6 +1,6 @@
 # V5 — Listwise Lexical Ranking
 
-Status: **core implementation ready; first real-model pilot pending**
+Status: **Jina v3.5 pilot complete; V5.1 instruction-following generative/listwise comparison proposed**
 
 Branch: `feat/dictionary-semantic-v5-listwise-ranker`
 
@@ -112,10 +112,10 @@ V2.5 relation labels are not sent to the listwise model.
 - [x] Evaluator reports model loading, each query start/completion, elapsed time, progress, and ETA.
 - [x] Recommended Colab invocation uses `python -u` to disable stdout buffering.
 - [ ] Run unit tests after pulling the branch.
-- [ ] Run Jina v3.5 on the 10-query benchmark.
-- [ ] Inspect lexical-neighbor failures first: `เดิน / รัก / มืด / บ้าน / ฝน`.
-- [ ] Compare pure listwise against light V2.5 fusion.
-- [ ] Record model load time and seconds/query.
+- [x] Run Jina v3.5 on the 10-query benchmark.
+- [x] Inspect lexical-neighbor failures first: `เดิน / รัก / มืด / บ้าน / ฝน`.
+- [x] Compare pure listwise against light V2.5 fusion.
+- [x] Record model load time and seconds/query.
 
 ## Evaluation decision
 
@@ -158,3 +158,69 @@ python -u scripts/evaluate_v5.py \
 ```
 
 The evaluator prints live status before model loading and before/after every query, including ETA.
+
+
+## First real Jina v3.5 pilot — findings
+
+Runtime:
+- V2.5 load: ~33s.
+- Jina v3.5 load: ~18s.
+- 10-query evaluation: ~32s total.
+- Average: ~3.22s/query.
+- Live progress / ETA worked as intended and solved the previous "silent run" problem.
+
+Quality improvements:
+- `ฝน`: `พิรุณ / พลาหก / โปรย` moved to the top; `น้ำตก` fell below stronger lexical candidates.
+- `เดิน`: `ย่างเท้า / ย่างตีน / ก้าว / ย่าง` beat `วิ่ง`; this is a clear improvement over V4 pointwise reranking.
+- `พูด`: `พูดจา / เอ่ย / จา / เว้า` remained high.
+- `กลัว`: `เกรงกลัว / หวาดกลัว / หวาดเกรง` appeared high.
+
+Remaining problems:
+- `บ้าน`: rare/dictionary forms `ภูม / วาสะ / เวศม์ / วสนะ / คาม / อธิวาส` still outrank `บ้านเรือน`; commonness preference is not being followed strongly.
+- `สวย`: `สะ / ย้อง / สุทัศน์` still outrank more natural common forms such as `งดงาม`.
+- `เร็ว`: rare forms `รยะ / สีฆ- / เชาว์ / ชัพ` remain too high; `ไว / รวดเร็ว / ด่วน` should be stronger.
+- `มืด`: `เสียสายตา` remains too high.
+- `รัก`: `สายใจ / จอด / ชู้สาว` still leak into the top set.
+
+Interpretation:
+- The listwise architecture is useful: relative semantic ordering improved, especially `เดิน`.
+- Jina v3.5 is still fundamentally trained as a relevance reranker. Its native prompt ranks passages by relevance to a query; the Thai Words custom priority text is embedded inside the query rather than handled by a true instruction-following ranking interface.
+- Therefore the remaining bottleneck is now instruction obedience / lexical-ranking objective, not raw model size.
+
+## V5.1 direction — newer instruction-following ranker
+
+Do not add another commonness heuristic before testing a ranker that can explicitly follow ranking criteria.
+
+Primary local experiment:
+- `Qwen/Qwen3.5-0.8B`
+- Apache-2.0
+- modern 0.8B post-trained model
+- use as a **generative listwise ranker**, not as a pairwise scorer:
+  - give target word + selected sense + grammatical role;
+  - give all candidate IDs + word + definition together;
+  - ask for a strict JSON ordering of candidate IDs;
+  - explicitly require semantic preservation first and common contemporary Thai before equally valid literary/archaic forms.
+- This directly tests the user's hypothesis that a newer small foundation model can outperform older reranker foundations at the same scale.
+
+Secondary local control:
+- `ContextualAI/ctxl-rerank-v2-instruct-multilingual-1b`
+- 1B, 100+ languages, explicitly instruction-following reranker.
+- Research-only license (CC BY-NC-SA 4.0), so treat it as a quality control rather than final production dependency.
+
+Hosted frontier control, only if needed:
+- `mixedbread-ai/mxbai-rerank-v3.1-listwise`
+- listwise + natural-language instruction following.
+- Use only after local V5.1 results, so we do not add API cost/dependency prematurely.
+
+### V5.1 experiment order
+
+1. Keep V2.5 retrieval unchanged.
+2. Restore candidate pool to 50 for the model comparison, because `เรือน` appeared with the earlier top-50 pipeline and may be outside the current top-40 pool.
+3. Test Qwen3.5-0.8B generative listwise first.
+4. Compare against Jina v3.5 using exactly the same 50 candidates.
+5. Only if Qwen3.5 remains weak, test the ContextualAI 1B instruction-following reranker.
+6. Do not reintroduce TNC/commonness until the instruction-following comparison is complete.
+7. Preserve live progress + ETA for every evaluator.
+
+Decision gate:
+- Prefer the smallest model that improves `บ้าน / สวย / เร็ว` common-vs-rare ordering **without regressing** `เดิน / ฝน / รัก / มืด` semantic validity.
