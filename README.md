@@ -1,4 +1,128 @@
-# Thai Lexical Semantic V3
+# Thai Lexical Semantic V3.1
+
+V3.1 เปลี่ยน teacher pipeline จาก Gemini-first เป็น **dictionary rules → local Qwen → Gemini audit/fallback** เพื่อลด cloud API calls สำหรับพจนานุกรมมากกว่า 50,000 senses โดยยังใช้ V3 compiler, holdout, EmbeddingGemma fine-tuning และ benchmark เดิม
+
+แผน: `plans/v3-1-local-teacher-router.md`
+
+```text
+V2.5 grounded candidates (24/sense)
+        │
+        ▼
+safe Tier-5 dictionary auto-label
+        │
+        ▼
+route <= 8 uncertain candidates/sense
+        │
+        ▼
+Qwen3-4B-Instruct-2507 local 4-bit
+        │
+        ├── confident ───────────────┐
+        └── uncertain / low conf     │
+                    │                │
+                    ▼                │
+             Gemini audit            │
+           + random 2% sample        │
+                    └──────┬─────────┘
+                           ▼
+                  final teacher labels
+                           │
+                           ▼
+                 V3 triplet compiler
+                           │
+                           ▼
+              EmbeddingGemma fine-tune
+```
+
+## V3.1 Colab pilot จาก 100 seeds ที่สร้างไว้แล้ว
+
+ไม่ต้อง rebuild V1 หรือ V2.5 artifacts ถ้า Colab runtime เดิมยังอยู่:
+
+```python
+%cd /content/thai_word
+
+!git fetch origin
+!git checkout -B feat/dictionary-semantic-v3-1-local-teacher-router \
+  origin/feat/dictionary-semantic-v3-1-local-teacher-router
+
+!pip install -r requirements.txt
+!python -m unittest discover -s tests
+```
+
+Route 24 candidates เดิมให้เหลือเฉพาะ rule labels + สูงสุด 8 local candidates:
+
+```python
+!python scripts/route_v31_teacher_seeds.py \
+  --input artifacts/v3/teacher_seeds.jsonl \
+  --output artifacts/v3_1/routed_teacher_seeds.jsonl \
+  --max-local-candidates 8
+```
+
+Smoke test Qwen แค่ 10 senses ก่อน:
+
+```python
+!python scripts/generate_v31_local_teacher_labels.py \
+  --input artifacts/v3_1/routed_teacher_seeds.jsonl \
+  --output artifacts/v3_1/local_teacher_labels.jsonl \
+  --limit 10
+```
+
+ถ้าผ่าน ให้ทำ 100-seed pilot ที่เหลือต่อได้โดยไม่ใส่ `--limit`; script resume จากไฟล์เดิม:
+
+```python
+!python scripts/generate_v31_local_teacher_labels.py \
+  --input artifacts/v3_1/routed_teacher_seeds.jsonl \
+  --output artifacts/v3_1/local_teacher_labels.jsonl
+```
+
+สร้างชุด Gemini audit เฉพาะ low-confidence/uncertain + random 2%:
+
+```python
+!python scripts/build_v31_gemini_audit.py \
+  --input artifacts/v3_1/local_teacher_labels.jsonl \
+  --output artifacts/v3_1/gemini_audit_seeds.jsonl
+```
+
+Gemini เป็น optional สำหรับ local-only smoke run แต่แนะนำก่อน scale ใหญ่:
+
+```python
+!python scripts/generate_v3_teacher_labels.py \
+  --input artifacts/v3_1/gemini_audit_seeds.jsonl \
+  --output artifacts/v3_1/gemini_audit_labels.jsonl
+```
+
+Merge audit:
+
+```python
+!python scripts/merge_v31_teacher_labels.py \
+  --local artifacts/v3_1/local_teacher_labels.jsonl \
+  --audit artifacts/v3_1/gemini_audit_labels.jsonl \
+  --output artifacts/v3_1/final_teacher_labels.jsonl
+```
+
+Compile ด้วย V3 compiler เดิม:
+
+```python
+!python scripts/compile_v3_training_data.py \
+  --input artifacts/v3_1/final_teacher_labels.jsonl \
+  --index artifacts/v1 \
+  --triplets-output artifacts/v3_1/training_triplets.jsonl \
+  --graded-output artifacts/v3_1/graded_pairs.jsonl \
+  --report-output artifacts/v3_1/dataset_report.json
+
+!cat artifacts/v3_1/dataset_report.json
+```
+
+สำหรับ benchmark Qwen เทียบ Gemini บน seed ชุดเดียวกัน สามารถให้ Gemini label routed seeds ชุดเล็กแยกไฟล์ แล้วรัน:
+
+```python
+!python scripts/compare_v31_teachers.py \
+  --local artifacts/v3_1/local_teacher_labels.jsonl \
+  --gemini artifacts/v3_1/gemini_benchmark_labels.jsonl
+```
+
+---
+
+# Thai Lexical Semantic V3 (legacy Gemini-first teacher design)
 
 V3 ต่อจาก V2.5 โดยใช้ `google/embeddinggemma-300m` เป็นฐาน แล้วสร้าง relation dataset ภาษาไทยเฉพาะงานคลังคำสำหรับนักเขียน จาก candidate ที่มีอยู่จริงในพจนานุกรมและระบบ V2.5 ค้นมาได้ ก่อนใช้ LLM teacher จัดประเภท relation และ compile เป็น contrastive triplets สำหรับ fine-tuning
 
