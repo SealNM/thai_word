@@ -11,7 +11,7 @@ from typing import Any
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from thai_gemma_v53 import DEFAULT_GEMMA4_E2B_QAT, Gemma4ListwiseJudge
+from thai_gemma_v53 import (\n    DEFAULT_GEMMA4_E2B_QAT,\n    GEMMA4_PROMPT_VERSION,\n    Gemma4ListwiseJudge,\n)
 from thai_hybrid_v2 import HybridSearcher
 from thai_lexical_v1 import load_artifacts
 from thai_listwise_v5 import JinaListwiseRanker, annotate_listwise_scores
@@ -216,8 +216,7 @@ def main() -> None:
         "config": args.config,
         "index": args.index,
         "dense_index": args.dense_index,
-        "gemma_model": args.gemma_model,
-        "candidate_pool": args.candidate_pool,
+        "gemma_model": args.gemma_model,\n        "gemma_prompt_version": GEMMA4_PROMPT_VERSION,\n        "candidate_pool": args.candidate_pool,
         "jina_pool": args.jina_pool,
         "top_k": args.top_k,
         "modes": modes,
