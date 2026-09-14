@@ -1,6 +1,6 @@
 # V5 — Listwise Lexical Ranking
 
-Status: **V5.1 first run diagnosed; short-form Qwen generative ranking fix implemented, rerun pending**
+Status: **V5.1 Qwen experiment complete; V5.2 instruction-following multilingual reranker implemented, real-model pilot pending**
 
 Branch: `feat/dictionary-semantic-v5-listwise-ranker`
 
@@ -321,3 +321,82 @@ python -u scripts/evaluate_v51.py \
   --mode fusion \
   --output artifacts/v5/qwen35-short15-rerun.json
 ```
+
+
+## V5.1 short-form Qwen rerun — final finding
+
+Observed:
+- Model load: ~12s.
+- 10-query run: ~29s total.
+- Average: ~2.94s/query.
+- This is fast enough for experimentation, but output reliability and ranking quality were not good enough.
+
+Parse behavior:
+- Every query still required recovery.
+- Explicit IDs per requested top-15 ranged from 5/15 to 14/15.
+- Several generations simply echoed the leading V2.5 IDs.
+- Some generations produced semantically weak or clearly odd candidates high in the ranking.
+
+Examples:
+- `ฝน`: `ตก / หยด / เละ` leaked into the top set.
+- `โกรธ`: `ออกฤทธิ์ / ดูหรู / แผลงฤทธิ์แผลงเดช` leaked upward.
+- `พูด`: `เคาะ / เพ้อ / เป็นปากเสียง` ranked too high.
+- `บ้าน`: `บ้านเรือน` improved strongly, but `เวศม์` still ranked first and `บริเวณ / โรงเรือน` leaked upward.
+- `สวย / มืด / กลัว` remained unstable.
+- `รัก / เร็ว` often echoed the V2.5 ordering rather than demonstrating a reliable new ranking policy.
+
+Decision:
+- [x] Stop the Qwen3.5-0.8B generative-listwise path.
+- [x] Do not increase generation length or model size to rescue the same approach.
+- [x] Keep the code as an experiment/reference only.
+- [x] Move to a model trained specifically for instruction-following reranking.
+
+## V5.2 — Instruction-following multilingual reranker
+
+Primary local control:
+- `ContextualAI/ctxl-rerank-v2-instruct-multilingual-1b`
+- 1B parameters.
+- 100+ languages.
+- 32K context.
+- Designed specifically for custom reranking instructions.
+- Supports Sentence Transformers `CrossEncoder.rank/predict(..., prompt=instruction)`.
+- Research-only license: CC BY-NC-SA 4.0; do not treat as final production dependency.
+
+Why this test:
+- V5 showed that listwise comparison can improve semantic-neighbor errors.
+- V5.1 showed that a small general instruction model is not reliably structured enough to act as the ranking engine.
+- V5.2 isolates the remaining hypothesis: whether a **reranker trained to obey custom ranking instructions** can enforce Thai Words' priority order more reliably than relevance-only Jina or generative Qwen.
+
+Implemented:
+- [x] Add `thai_instruct_v52.py`.
+- [x] Use the official Sentence Transformers CrossEncoder path.
+- [x] Pass Thai Words' ranking policy through the model's native `prompt` instruction interface.
+- [x] Ranking policy prioritizes intended sense and grammatical role before commonness.
+- [x] Common contemporary Thai is preferred only among equally valid lexical substitutes.
+- [x] Keep the shared V2.5 top-50 retrieval pool.
+- [x] Add pure `instruct` mode.
+- [x] Add light V2.5 fusion control with V2.5 weight 0.2 and instruction-reranker weight 1.0.
+- [x] Auto-select BF16 on supported CUDA hardware, otherwise FP16 on CUDA and FP32 on CPU.
+- [x] Add live progress, per-query latency, and ETA.
+- [x] Add `scripts/evaluate_v52.py`.
+- [x] Add no-model unit coverage in `tests/test_instruct_v52.py`.
+- [ ] Run V5.2 tests in Colab.
+- [ ] Run the 10-query V5.2 real-model pilot.
+- [ ] Inspect `บ้าน / สวย / เร็ว` for common-vs-rare ordering.
+- [ ] Confirm `เดิน / ฝน / รัก / มืด` do not regress on semantic validity.
+- [ ] Compare latency against Jina (~3.13s/query) and Qwen3.5 (~2.94s/query).
+
+Recommended pilot:
+
+```bash
+python -u scripts/evaluate_v52.py \
+  --dense-index artifacts/v2/embeddinggemma-300m-256 \
+  --candidate-pool 50 \
+  --top-k 10 \
+  --device cuda \
+  --mode instruct \
+  --mode fusion \
+  --output artifacts/v5/ctxl-v2-instruct-1b-pilot.json
+```
+
+If V5.2 still cannot obey the common-vs-rare priority reliably, the next meaningful control is a true listwise + instruction-following service such as Mixedbread's `mxbai-rerank-v3.1-listwise`, rather than another local general-purpose LLM experiment.
