@@ -74,7 +74,7 @@ def rank_ctxl_candidates(
     *,
     mode: str = "instruct",
     top_k: int = 20,
-    v25_weight: float = 0.2,
+    v25_weight: float = 0.1,
     instruct_weight: float = 1.0,
     rrf_k: int = 20,
 ) -> list[dict[str, Any]]:
