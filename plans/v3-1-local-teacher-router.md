@@ -170,3 +170,27 @@ Added:
   - keeps frozen holdout checks
 
 The 9-way relation classifier remains useful for audit/analysis, but the direct selector is now the preferred local path for contrastive training.
+
+
+## Decision checkpoint — V2.5 remains the best baseline
+
+Status: **V3.1 teacher path paused for redesign**
+
+Based on the first real V3/V3.1 experiments, **V2.5 remains the strongest and most reliable version at this point**.
+
+Why:
+- V2.5 EmbeddingGemma retrieval already produced strong qualitative results for the actual Thai Words objective.
+- The V3.1 local Qwen teacher path proved technically runnable, but relation quality was not reliable enough for safe contrastive supervision.
+- High-confidence local labels could still contain ontology mistakes such as near-synonym vs associated, subtype/supertype direction, and overly aggressive hard-negative choices.
+- The faster direct-selector experiment improved throughput substantially, but its first results still selected unsafe hard negatives for highly related forms.
+- Therefore, continuing to scale the current teacher pipeline risks degrading a good V2.5 embedding space rather than improving it.
+
+Current decision:
+1. **Keep V2.5 as the primary baseline and preferred search architecture.**
+2. Do not replace V2.5 with V3/V3.1.
+3. Pause large-scale teacher generation and EmbeddingGemma fine-tuning with the current V3.1 labels.
+4. Preserve all V3/V3.1 code and experiments as research material.
+5. Any future V3.x direction must demonstrate that its training data is safer and more useful than the current teacher approach before fine-tuning is resumed.
+6. Future work should consider alternative improvements that retain V2.5 strengths instead of assuming model fine-tuning is necessary.
+
+This checkpoint supersedes the earlier assumption that the next mandatory step after V2.5 was large-scale teacher labeling + EmbeddingGemma fine-tuning.
