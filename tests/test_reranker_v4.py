@@ -11,6 +11,7 @@ from thai_reranker_v4 import (
     is_high_precision_lexical,
     rank_v4_candidates,
     resolve_reranker_profile,
+    semantic_commonness_eligible,
 )
 
 
@@ -87,8 +88,8 @@ class V4RerankerTests(unittest.TestCase):
         self.assertIn("Thai candidate word: พิรุณ", text)
         self.assertIn("Dictionary meaning: ฝน", text)
 
-    def test_v41_profile_prefers_common_substitutes(self) -> None:
-        profile = resolve_reranker_profile("qwen3-0.6b-v4.1")
+    def test_v42_profile_keeps_strict_substitutability_prompt(self) -> None:
+        profile = resolve_reranker_profile("qwen3-0.6b-v4.2")
         instruction = str(profile["instruction"])
         self.assertIn("lexical substitutability", instruction)
         self.assertIn("commonly used Thai words", instruction)
@@ -140,45 +141,100 @@ class V4RerankerTests(unittest.TestCase):
         self.assertIn("v25_score", results[0])
         self.assertIn("reranker_score", results[0])
 
-    def test_commonness_rank_uses_frequency_but_missing_words_get_no_boost(self) -> None:
-        scorer = _FakeScorer([0.8, 0.79, 0.78])
+    def test_token_aware_commonness_helps_natural_compound(self) -> None:
+        candidates = [
+            _candidate("บ้านเรือน", score=0.4, definition="บ้านและเรือน"),
+            _candidate("วาสะ", score=0.3, definition="ที่อยู่"),
+        ]
+        annotated = annotate_commonness(
+            candidates,
+            {
+                "บ้าน": 5000,
+                "เรือน": 3000,
+                "วาสะ": 2,
+            },
+            source="fake",
+            tokenizer=lambda word: {
+                "บ้านเรือน": ["บ้าน", "เรือน"],
+                "วาสะ": ["วาสะ"],
+            }[word],
+        )
+        by_word = {item["word"]: item for item in annotated}
+        self.assertGreater(
+            by_word["บ้านเรือน"]["commonness_score"],
+            by_word["วาสะ"]["commonness_score"],
+        )
+        self.assertEqual(by_word["บ้านเรือน"]["commonness_count"], 0)
+
+    def test_semantic_gate_rejects_frequent_but_weak_candidate(self) -> None:
+        weak = {
+            "relation_tier": 0,
+            "lexical_form": "standalone",
+            "reranker_rank": 7,
+            "v25_rank": 35,
+        }
+        self.assertFalse(semantic_commonness_eligible(weak))
+
+        consensus = dict(weak)
+        consensus["reranker_rank"] = 8
+        consensus["v25_rank"] = 15
+        self.assertTrue(semantic_commonness_eligible(consensus))
+
+        lexical = dict(weak)
+        lexical["relation_tier"] = 4
+        self.assertTrue(semantic_commonness_eligible(lexical))
+
+    def test_gated_commonness_caps_frequency_promotion(self) -> None:
+        candidates = []
+        for index in range(1, 8):
+            candidates.append(
+                {
+                    "word": f"w{index}",
+                    "reranker_score": 1.0 - index / 100,
+                    "reranker_rank": index,
+                    "v25_rank": index,
+                    "relation_tier": 4 if index == 7 else 0,
+                    "lexical_form": "standalone",
+                    "commonness_score": float(index),
+                    "commonness_rank": 8 - index,
+                }
+            )
+
+        results = rank_v4_candidates(
+            candidates,
+            mode="gated-commonness",
+            top_k=7,
+            v25_weight=1.0,
+            reranker_weight=1.0,
+            commonness_weight=1.0,
+            commonness_promotion_cap=3,
+            rrf_k=20,
+        )
+        by_word = {item["word"]: item for item in results}
+        self.assertLessEqual(by_word["w7"]["commonness_promotion"], 3)
+        self.assertGreaterEqual(
+            by_word["w7"]["adjusted_fusion_rank"],
+            by_word["w7"]["fusion_rank"] - 3,
+        )
+
+    def test_zero_gated_commonness_weight_matches_fusion_order(self) -> None:
+        scorer = _FakeScorer([0.4, 0.9, 0.8])
         scored = annotate_reranker_scores("ฝน", self.candidates, scorer)
         scored = annotate_commonness(
             scored,
-            {"พลาหก": 2, "เมฆ": 1000},
-            source="fake",
+            {"พิรุณ": 999, "พลาหก": 2, "เมฆ": 1000},
+            tokenizer=lambda word: [word],
         )
-
-        by_word = {item["word"]: item for item in scored}
-        self.assertEqual(by_word["เมฆ"]["commonness_rank"], 1)
-        self.assertEqual(by_word["พลาหก"]["commonness_rank"], 2)
-        self.assertIsNone(by_word["พิรุณ"]["commonness_rank"])
-
-        results = rank_v4_candidates(
-            scored,
-            mode="commonness",
-            top_k=3,
-            v25_weight=0.0,
-            reranker_weight=1.0,
-            commonness_weight=1.0,
-            rrf_k=20,
-        )
-        self.assertEqual(results[0]["word"], "เมฆ")
-
-    def test_zero_commonness_weight_matches_fusion_order(self) -> None:
-        scorer = _FakeScorer([0.4, 0.9, 0.8])
-        scored = annotate_reranker_scores("ฝน", self.candidates, scorer)
-        scored = annotate_commonness(scored, {"พิรุณ": 999, "เมฆ": 1})
 
         fusion = rank_v4_candidates(scored, mode="fusion", top_k=3)
-        common = rank_v4_candidates(
+        gated = rank_v4_candidates(
             scored,
-            mode="commonness",
+            mode="gated-commonness",
             top_k=3,
             commonness_weight=0.0,
         )
         self.assertEqual(
-            [item["word"] for item in common],
+            [item["word"] for item in gated],
             [item["word"] for item in fusion],
         )
 
