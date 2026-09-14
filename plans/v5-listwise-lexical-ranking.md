@@ -1,6 +1,6 @@
 # V5 — Listwise Lexical Ranking
 
-Status: **V5.2 pilot complete; V5.3 Gemma 4 direct + Jina→Gemma experiment implemented, real-model pilot pending**
+Status: **V5.3 Gemma 4 pilot complete; Gemma-direct is strongest quality direction, V5.3.1 hard lexical gate + smaller pool rerun pending**
 
 Branch: `feat/dictionary-semantic-v5-listwise-ranker`
 
@@ -591,3 +591,85 @@ Notes:
 - The first Gemma run may download roughly 2.5 GB of model weights.
 - Gemma 4 requires a recent Transformers build. If the runtime cannot resolve the Gemma 4 architecture or `AutoModelForMultimodalLM`, upgrade Transformers and restart Colab.
 - The official Gemma 4 E2B model card states 128K context for the smaller E2B/E4B models, native system-role support, configurable thinking, and multilingual pretraining over 140+ languages.
+
+
+## V5.3 real Gemma 4 pilot — findings
+
+Reliability:
+- Gemma returned a complete explicit 10/10-ID ranking for every query in both direct and Jina→Gemma modes.
+- This is a major improvement over Qwen3.5-0.8B, which repeatedly required parser recovery.
+
+Runtime:
+- Gemma model load: ~60s.
+- Gemma-direct on top-50: ~19–22s/query.
+- Jina→Gemma on top-20: ~17–19s/query, plus the one-time Jina narrowing pass.
+- Both modes together: ~38.05s/query.
+- Quality is promising, but direct top-50 latency is too high for a final interactive search path.
+
+### Quality result
+
+Gemma-direct is the strongest overall direction tested so far for the product-specific common-vs-rare requirement.
+
+Strong wins:
+- `เดิน`: `ก้าว / ย่างเท้า / ย่าง / ผเดิน ...`; importantly `วิ่ง` disappeared from the top-10.
+- `สวย`: `งดงาม` ranked #1 and common/natural appearance vocabulary improved substantially.
+- `พูด`: `พูดจา / จา / ... / เอ่ย / เอื้อนเอ่ย` remained useful.
+- `เร็ว`: `รีบ / ไว / เร็ว ๆ / รีบรุด / เร่ง / เร่งรีบ / ฉับไว / ว่องไว`; this is the clearest common-first result so far.
+- `กลัว`: common/direct fear forms such as `หวาดกลัว / หวั่นหวาด / หวาดเกรง / เกรงกลัว` surfaced well.
+- `บ้าน`: `บ้านเรือน` reached #2 in direct mode and #1 after Jina narrowing, a large improvement over previous rankers.
+
+Remaining semantic leakage in direct mode:
+- `ฝน`: verbs/associations such as `ตก / ปรอย` and weather neighbors such as `เมฆ / พยับเมฆ` still rank too high.
+- `รัก`: `สารภาพ / ที่รัก / น้ำใจ / ชู้สาว` are related but not clean replacements.
+- `มืด`: mostly improved, but `บอด` remains a role/meaning mismatch.
+- `สวย`: `ดี` is overly general despite the otherwise strong ordering.
+- `บ้าน`: `คาม` still outranks `บ้านเรือน` in direct mode.
+
+### Direct vs Jina→Gemma
+
+Jina→Gemma is not a universal improvement:
+- It helps `บ้าน` by moving `บ้านเรือน` to #1 and reduces some broad tail noise.
+- It helps semantic safety on parts of `ฝน`.
+- But it often reintroduces Jina's rare-word bias and can remove strong common candidates before Gemma sees them.
+- It is clearly worse than Gemma-direct for `เดิน / สวย / มืด / เร็ว / กลัว` common-first behavior.
+
+Decision:
+- [x] Keep Gemma-direct as the primary V5.3 direction.
+- [x] Keep Jina→Gemma as a diagnostic/control, not the default architecture.
+- [x] Do not proceed to rarity-penalty V5.4 yet.
+- [x] First test whether a stronger lexical-validity prompt and a smaller direct candidate pool can preserve Gemma's quality while reducing latency.
+
+## V5.3.1 — hard lexical gate + direct top-30
+
+Implemented prompt revision:
+- prompt version `v5.3.1-hard-lexical-gate`;
+- make same-sense and same-grammatical-role requirements explicit hard gates;
+- tell Gemma to infer candidate role from the headword/definition when no POS metadata is available;
+- explicitly state that associated words must rank below true substitutes even if frequent or semantically close;
+- explicitly demote different parts of speech, cause/effect, objects/agents, compounds with another role, and manner/subtype changes;
+- commonness is considered only after lexical validity;
+- if fewer than 10 strong substitutes exist, related alternatives may fill only the lower positions.
+
+Rationale:
+- the model is already strong at common-vs-rare ordering;
+- the remaining errors are primarily lexical-validity leaks (`ฝน→ตก/เมฆ`, `รัก→สารภาพ/ที่รัก`, `มืด→บอด`);
+- therefore the next test should tighten semantic/grammatical gating rather than add frequency heuristics.
+
+Focused next run:
+- Gemma-direct only;
+- reduce V2.5 candidate pool from 50 to 30;
+- still request top-10;
+- compare against the existing top-50 Gemma-direct pilot;
+- success requires keeping `บ้านเรือน / งดงาม / ไว / รวดเร็ว` style gains while reducing semantic leaks and bringing latency down materially.
+
+Recommended command:
+
+```bash
+python -u scripts/evaluate_v53.py \
+  --dense-index artifacts/v2/embeddinggemma-300m-256 \
+  --candidate-pool 30 \
+  --top-k 10 \
+  --device cuda \
+  --mode direct \
+  --output artifacts/v5/gemma4-e2b-direct30-hardgate.json
+```
