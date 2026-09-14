@@ -68,7 +68,7 @@ def main() -> None:
         choices=["instruct", "fusion"],
         help="Repeat to select variants. Defaults to instruct + light V2.5 fusion.",
     )
-    parser.add_argument("--v25-rank-weight", type=float, default=0.2)
+    parser.add_argument("--v25-rank-weight", type=float, default=0.1)
     parser.add_argument("--instruct-rank-weight", type=float, default=1.0)
     parser.add_argument("--rrf-k", type=int, default=20)
     parser.add_argument("--output", default=None)
