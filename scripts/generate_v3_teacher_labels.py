@@ -14,16 +14,21 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from thai_v3_data import RELATIONS, REGISTERS, append_jsonl, read_jsonl
 
 
-def _response_schema() -> dict[str, Any]:
+def _response_schema(candidate_words: list[str]) -> dict[str, Any]:
     return {
         "type": "object",
         "properties": {
             "judgments": {
                 "type": "array",
+                "minItems": len(candidate_words),
+                "maxItems": len(candidate_words),
                 "items": {
                     "type": "object",
                     "properties": {
-                        "candidate_word": {"type": "string"},
+                        "candidate_word": {
+                            "type": "string",
+                            "enum": candidate_words,
+                        },
                         "relation": {
                             "type": "string",
                             "enum": sorted(RELATIONS),
@@ -205,7 +210,8 @@ def main() -> None:
     if args.dry_run:
         print(_prompt(seeds[0]))
         print("\n--- RESPONSE SCHEMA ---")
-        print(json.dumps(_response_schema(), ensure_ascii=False, indent=2))
+        words = [candidate["word"] for candidate in seeds[0]["candidates"]]
+        print(json.dumps(_response_schema(words), ensure_ascii=False, indent=2))
         return
 
     api_key = os.environ.get("GEMINI_API_KEY")
@@ -240,13 +246,16 @@ def main() -> None:
     for index, seed in enumerate(pending, start=1):
         seed_id = seed.get("seed_id", "<unknown>")
         try:
+            candidate_words = [
+                candidate["word"] for candidate in seed["candidates"]
+            ]
             interaction = client.interactions.create(
                 model=args.model,
                 input=_prompt(seed),
                 response_format={
                     "type": "text",
                     "mime_type": "application/json",
-                    "schema": _response_schema(),
+                    "schema": _response_schema(candidate_words),
                 },
             )
             parsed = json.loads(interaction.output_text)
