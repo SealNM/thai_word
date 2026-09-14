@@ -107,3 +107,25 @@ This keeps Gemini calls to a small fraction of the original V3 plan.
 - [ ] Inspect relation quality/distribution for the 10-task smoke sample.
 - [ ] Complete 100-task local pilot if quality is acceptable.
 - [ ] Build Gemini audit subset and compare disagreement patterns.
+
+
+## Throughput optimization after first 10-sense pilot
+
+Observed:
+- First 10 Qwen senses completed successfully with 0 failures.
+- End-to-end runtime was more than 10 minutes, which is too slow to scale naively.
+
+Changes:
+- [x] Compact output schema uses candidate ids and short relation/register codes.
+- [x] Removed generated reason text from the local teacher path because it is not used by the training compiler.
+- [x] Reduced default output budget from 1400 to 320 tokens per sense.
+- [x] Batch 4 senses per generation call by default.
+- [x] Added model-load time, generation time, repair count, and senses/minute metrics.
+- [x] Keep automatic single-row repair only for malformed compact JSON.
+
+Scaling policy:
+- Do **not** plan to label all 50,000+ senses by default.
+- Use staged sampling: 100 -> 1,000 -> roughly 5,000-10,000 diverse anchors.
+- Evaluate held-out retrieval quality after each dataset expansion.
+- Continue adding teacher data only while holdout quality materially improves.
+- Full-dictionary labeling is an optional later experiment, not a V3.1 requirement.
