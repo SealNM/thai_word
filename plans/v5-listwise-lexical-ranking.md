@@ -1,6 +1,6 @@
 # V5 — Listwise Lexical Ranking
 
-Status: **V5.2 pilot complete; V5.3 Gemma 4 experiment selected before rarity-penalty work**
+Status: **V5.2 pilot complete; V5.3 Gemma 4 direct + Jina→Gemma experiment implemented, real-model pilot pending**
 
 Branch: `feat/dictionary-semantic-v5-listwise-ranker`
 
@@ -545,3 +545,49 @@ Decision questions:
 - Is latency acceptable relative to Jina (~3.13s/query)?
 
 Rarity-penalty V5.3 work is postponed and becomes V5.4 only if Gemma 4 does not solve the product-specific common-vs-rare ordering sufficiently.
+
+
+## V5.3 implementation checkpoint — Gemma 4
+
+Implemented:
+- [x] Add `thai_gemma_v53.py`.
+- [x] Default to Google's official compact checkpoint:
+  `google/gemma-4-E2B-it-qat-mobile-transformers`.
+- [x] Use `AutoProcessor` + `AutoModelForMultimodalLM` following Google's Gemma 4 Transformers interface.
+- [x] Use native `system` role for the Thai Words ranking policy.
+- [x] Disable Gemma thinking with `enable_thinking=False`.
+- [x] Use Google's published sampling defaults: temperature 1.0, top-p 0.95, top-k 64.
+- [x] Request only top-10 candidate IDs; never ask for a full top-50 permutation.
+- [x] No silent ranking fallback: incomplete Gemma output remains visibly incomplete.
+- [x] Keep raw generation output and parse-completeness metadata.
+- [x] Add `Gemma-direct`: judge the same V2.5 top-50 pool directly.
+- [x] Add `Jina -> Gemma`: Jina semantically narrows top-50 to top-20, then Gemma chooses top-10.
+- [x] Cache all Jina top-20 pools first, unload Jina, clear GPU cache, and only then load Gemma. This avoids keeping both rankers resident during Gemma inference.
+- [x] Add live setup/model/query progress and ETA.
+- [x] Add `scripts/evaluate_v53.py`.
+- [x] Add no-model parser/prompt tests in `tests/test_gemma_v53.py`.
+- [ ] Run V5.3 no-model tests in Colab.
+- [ ] Run the real Gemma 4 direct + Jina→Gemma pilot.
+- [ ] Require 10/10 explicit IDs on most queries before trusting the quality comparison.
+- [ ] Compare `บ้าน / สวย / เร็ว` common-vs-rare ordering.
+- [ ] Confirm `เดิน / ฝน / รัก / มืด` semantic validity.
+- [ ] Record direct vs cascade latency.
+
+### Recommended V5.3 pilot
+
+```bash
+python -u scripts/evaluate_v53.py \
+  --dense-index artifacts/v2/embeddinggemma-300m-256 \
+  --candidate-pool 50 \
+  --jina-pool 20 \
+  --top-k 10 \
+  --device cuda \
+  --mode direct \
+  --mode jina-gemma \
+  --output artifacts/v5/gemma4-e2b-direct-vs-jina20.json
+```
+
+Notes:
+- The first Gemma run may download roughly 2.5 GB of model weights.
+- Gemma 4 requires a recent Transformers build. If the runtime cannot resolve the Gemma 4 architecture or `AutoModelForMultimodalLM`, upgrade Transformers and restart Colab.
+- The official Gemma 4 E2B model card states 128K context for the smaller E2B/E4B models, native system-role support, configurable thinking, and multilingual pretraining over 140+ languages.
