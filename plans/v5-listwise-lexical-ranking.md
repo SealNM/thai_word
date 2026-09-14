@@ -1,6 +1,6 @@
 # V5 — Listwise Lexical Ranking
 
-Status: **Jina v3.5 pilot complete; V5.1 instruction-following generative/listwise comparison proposed**
+Status: **Jina v3.5 pilot complete; V5.1 Qwen3.5 generative-listwise comparison implemented, real-model pilot pending**
 
 Branch: `feat/dictionary-semantic-v5-listwise-ranker`
 
@@ -224,3 +224,50 @@ Hosted frontier control, only if needed:
 
 Decision gate:
 - Prefer the smallest model that improves `บ้าน / สวย / เร็ว` common-vs-rare ordering **without regressing** `เดิน / ฝน / รัก / มืด` semantic validity.
+
+
+## V5.1 implementation checkpoint
+
+Implemented on the same V5 branch:
+
+- [x] Add `thai_generative_v51.py`.
+- [x] Add `Qwen35GenerativeListwiseRanker` using `Qwen/Qwen3.5-0.8B`.
+- [x] Use Qwen3.5 as a true generative listwise ranker: all candidate IDs, words, and definitions are presented together and the model returns a full ordering.
+- [x] Make ranking policy explicit: intended sense -> grammatical role -> natural lexical substitute -> common contemporary Thai before equally valid rare/literary forms.
+- [x] Keep Qwen3.5 in its default non-thinking mode and use deterministic generation for this ranking task.
+- [x] Add strict JSON-array output contract.
+- [x] Add robust parser that accepts a complete JSON ordering, recovers wrapped output, removes duplicates/out-of-range IDs, and appends any missing IDs in original V2.5 order instead of crashing.
+- [x] Record whether each Qwen generation parsed completely or required recovery.
+- [x] Add `scripts/evaluate_v51.py`.
+- [x] Precompute the V2.5 top-50 pools once so Jina and Qwen3.5 see **exactly the same candidates**.
+- [x] Load Jina and Qwen3.5 sequentially and release GPU cache between rankers.
+- [x] Preserve live progress, per-query timing, ETA, and immediate top-10 output.
+- [x] Add `scripts/search_v51.py`.
+- [x] Add parser/prompt unit tests in `tests/test_generative_v51.py`.
+- [ ] Run V5 and V5.1 no-model tests in Colab after pulling.
+- [ ] Run the real Jina-vs-Qwen3.5 shared-top-50 comparison.
+- [ ] Inspect parse completeness; a frequent recovered/partial Qwen output is itself a failure signal.
+- [ ] Compare `บ้าน / สวย / เร็ว` common-vs-rare ordering.
+- [ ] Confirm `เดิน / ฝน / รัก / มืด` do not regress on semantic validity.
+- [ ] Compare seconds/query and model load time.
+
+### Qwen3.5 runtime note
+
+The official Qwen3.5 model card states that a recent/latest Hugging Face Transformers build is required. The repository dependency range already permits newer Transformers versions, but an older existing Colab environment may need an explicit upgrade before the first V5.1 run.
+
+### Recommended V5.1 comparison
+
+```bash
+python -u scripts/evaluate_v51.py \
+  --dense-index artifacts/v2/embeddinggemma-300m-256 \
+  --candidate-pool 50 \
+  --top-k 10 \
+  --device cuda \
+  --ranker jina-v3.5 \
+  --ranker qwen3.5-0.8b \
+  --mode listwise \
+  --mode fusion \
+  --output artifacts/v5/qwen35-vs-jina-shared50.json
+```
+
+If Qwen3.5 fails to load because the installed Transformers build is too old, upgrade Transformers first and restart the Colab runtime before rerunning the comparison.
