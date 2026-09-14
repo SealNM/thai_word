@@ -1,6 +1,6 @@
 # V4 — V2.5 Candidate Retrieval + Instruction-Aware Reranking
 
-Status: **V4.1 pilot complete; V4.2 semantic-gated commonness implemented, real-model rerun pending**
+Status: **V4.2 pilot complete; V4.3 category-aware 0.6B vs 4B comparison implemented, real-model rerun pending**
 
 Branch: `feat/dictionary-semantic-v4-instruction-reranker`
 
@@ -340,10 +340,10 @@ Implemented:
 - [x] Update the evaluator to compare rerank / fusion / gated-commonness while reusing one Qwen inference.
 - [x] Sweep gated-commonness strength at 0.5 and 1.0 by default.
 - [x] Add tests for token-aware compound familiarity, semantic-gate eligibility, capped promotion, and zero-weight equivalence to fusion.
-- [ ] Run the 10-query V4.2 pilot in Colab.
-- [ ] Inspect whether frequent unrelated words stop jumping into the top 10.
-- [ ] Inspect whether `บ้านเรือน / เรือน / บ้านช่อง` gain moderately without allowing `ที่ / อยู่ / ปลูก` to dominate.
-- [ ] Inspect whether literary alternatives remain available lower in the list.
+- [x] Run the 10-query V4.2 pilot in Colab.
+- [x] Inspect whether frequent unrelated words stop jumping into the top 10.
+- [x] Inspect whether `บ้านเรือน / เรือน / บ้านช่อง` gain moderately without allowing `ที่ / อยู่ / ปลูก` to dominate.
+- [x] Inspect whether literary alternatives remain available lower in the list.
 
 ### Recommended V4.2 pilot
 
@@ -365,3 +365,86 @@ python scripts/evaluate_v4.py \
 ```
 
 Both gated-commonness variants reuse the same reranker scores; Qwen is not run twice.
+
+
+## V4.2 real-model finding — safety improved, lexical judgment remains the bottleneck
+
+The semantic gate and capped commonness promotion behaved as intended:
+
+- frequent but clearly unrelated words no longer jumped upward as aggressively as in V4.1;
+- `บ้านเรือน` moved upward modestly without `อยู่ / ปลูก` dominating;
+- literary and rare alternatives remained available.
+
+However, the main ranking error remained upstream of commonness:
+
+- `ฝน -> น้ำตก`
+- `เดิน -> วิ่ง`
+- `รัก -> คู่รัก`
+- `มืด -> หน้ามืด / เสียสายตา`
+- `บ้าน -> อธิวาส / วาสะ` still above common alternatives
+
+Conclusion:
+
+> V4.2 fixed how commonness is allowed to influence ranking, but the reranker is still not reliably separating lexical substitutes from semantic neighbors.
+
+Do not tune commonness weights or promotion caps further until reranker quality is isolated.
+
+## V4.3 — Category-aware reranking + 4B capacity check
+
+Goal:
+
+Test whether the remaining errors come primarily from missing grammatical/query context or from the capacity of the 0.6B reranker before adding another heuristic layer.
+
+Changes:
+
+- [x] Pass the evaluation `category` into the reranker query text as `Query category / grammatical role`.
+- [x] Keep the selected dictionary sense in the same query text.
+- [x] Add optional `--category` to `scripts/search_v4.py`.
+- [x] Add `qwen3-0.6b-v4.3` profile.
+- [x] Add `qwen3-4b-v4.3` profile using `Qwen/Qwen3-Reranker-4B`.
+- [x] Load the 4B challenger in FP16 for the Colab GPU path.
+- [x] Use profile-specific default reranker batch sizes: 0.6B = 16, 4B = 4.
+- [x] Update `CrossEncoderPairScorer` to accept model kwargs without changing the scoring interface.
+- [x] Update evaluator so repeated `--reranker` values run sequentially, not simultaneously, and GPU cache is released between models.
+- [x] V4.3 evaluator defaults to comparing `qwen3-0.6b-v4.3` and `qwen3-4b-v4.3`.
+- [x] Default comparison uses only `rerank` and `fusion` so model capacity/category effects are not hidden by another commonness heuristic.
+- [x] Keep V4.2 `gated-commonness` available as an optional mode, but do not make it part of the primary V4.3 experiment.
+- [x] Add `--ignore-category` as a clean control if we need to isolate whether category context itself changes results.
+- [x] Add unit coverage for category propagation and both V4.3 model profiles.
+- [ ] Run V4.3 0.6B vs 4B on the same 10-query benchmark.
+- [ ] Compare `เดิน`, `รัก`, `มืด`, and `บ้าน` first because they expose grammatical/lexical-neighbor failures most clearly.
+- [ ] Check whether 4B improves common-vs-literary ordering without commonness assistance.
+- [ ] Record per-model load time and seconds/query.
+- [ ] Only after this comparison decide whether another semantic-validity classifier or ranking heuristic is justified.
+
+### Recommended V4.3 pilot
+
+```bash
+python scripts/evaluate_v4.py \
+  --dense-index artifacts/v2/embeddinggemma-300m-256 \
+  --candidate-pool 50 \
+  --top-k 10 \
+  --device cuda \
+  --reranker qwen3-0.6b-v4.3 \
+  --reranker qwen3-4b-v4.3 \
+  --mode rerank \
+  --mode fusion \
+  --output artifacts/v4/qwen3-v4.3-06b-vs-4b.json
+```
+
+The models are loaded and evaluated sequentially so the 0.6B and 4B weights do not have to coexist in GPU memory.
+
+Optional category ablation:
+
+```bash
+python scripts/evaluate_v4.py \
+  --dense-index artifacts/v2/embeddinggemma-300m-256 \
+  --candidate-pool 50 \
+  --top-k 10 \
+  --device cuda \
+  --reranker qwen3-0.6b-v4.3 \
+  --mode rerank \
+  --mode fusion \
+  --ignore-category \
+  --output artifacts/v4/qwen3-v4.3-no-category-control.json
+```
