@@ -21,10 +21,28 @@ WRITER_RERANK_INSTRUCTION = (
     "definition overlap, and candidates that substantially change the core meaning.\n"
 )
 
+WRITER_RERANK_INSTRUCTION_V41 = (
+    "Rank Thai dictionary candidates by lexical substitutability for a writer, not by "
+    "general semantic relatedness. A strong candidate should be able to replace the "
+    "query in a natural sentence while preserving the intended dictionary sense and "
+    "roughly the same grammatical role. Prefer contemporary, commonly used Thai words "
+    "before rare, literary, archaic, poetic, or highly formal alternatives when both "
+    "are equally accurate. Rare or literary alternatives are still useful, but should "
+    "usually rank below equally accurate common words. Strongly penalize antonyms, "
+    "topically associated words, cause/effect relations, objects or agents, compounds "
+    "and collocations that merely contain the query concept, subtype or manner changes "
+    "that alter the action, and accidental definition overlap. Do not reward a candidate "
+    "only because its dictionary definition mentions the query word.\n"
+)
+
 RERANKER_PROFILES: dict[str, dict[str, Any]] = {
     "qwen3-0.6b": {
         "model_id": DEFAULT_QWEN_RERANKER,
         "instruction": WRITER_RERANK_INSTRUCTION,
+    },
+    "qwen3-0.6b-v4.1": {
+        "model_id": DEFAULT_QWEN_RERANKER,
+        "instruction": WRITER_RERANK_INSTRUCTION_V41,
     },
     "bge-v2-m3": {
         "model_id": DEFAULT_BGE_RERANKER,
@@ -37,7 +55,7 @@ SAFE_RELATION_HINTS = {
     "mutual_definition_reference",
 }
 
-VALID_MODES = {"rerank", "fusion", "protected"}
+VALID_MODES = {"rerank", "fusion", "protected", "commonness"}
 
 
 class PairScorer(Protocol):
@@ -100,6 +118,62 @@ def is_high_precision_lexical(candidate: dict[str, Any]) -> bool:
     )
 
 
+def load_tnc_commonness() -> dict[str, int]:
+    """Load Thai unigram counts from the Thai National Corpus via PyThaiNLP."""
+    try:
+        from pythainlp.corpus.tnc import unigram_word_freqs
+    except ImportError as exc:
+        raise RuntimeError(
+            "PyThaiNLP TNC frequency data is required for V4.1 commonness ranking."
+        ) from exc
+
+    values = unigram_word_freqs()
+    result: dict[str, int] = {}
+    for word, raw_count in values.items():
+        word = normalize_text(word)
+        if not word:
+            continue
+        try:
+            count = int(raw_count)
+        except (TypeError, ValueError):
+            continue
+        if count > 0:
+            result[word] = count
+    return result
+
+
+def annotate_commonness(
+    candidates: list[dict[str, Any]],
+    frequency: dict[str, int] | None,
+    *,
+    source: str = "tnc",
+) -> list[dict[str, Any]]:
+    if not candidates:
+        return []
+
+    frequency = frequency or {}
+    counts: list[int] = []
+    for item in candidates:
+        word = normalize_text(item.get("word", ""))
+        try:
+            count = max(0, int(frequency.get(word, 0)))
+        except (TypeError, ValueError):
+            count = 0
+        counts.append(count)
+
+    ranked_counts = sorted({count for count in counts if count > 0}, reverse=True)
+    rank_by_count = {count: rank for rank, count in enumerate(ranked_counts, start=1)}
+
+    annotated: list[dict[str, Any]] = []
+    for candidate, count in zip(candidates, counts, strict=True):
+        item = dict(candidate)
+        item["commonness_source"] = source
+        item["commonness_count"] = count
+        item["commonness_rank"] = rank_by_count.get(count) if count > 0 else None
+        annotated.append(item)
+    return annotated
+
+
 class CrossEncoderPairScorer:
     def __init__(
         self,
@@ -139,8 +213,6 @@ class CrossEncoderPairScorer:
             "show_progress_bar": False,
         }
         if self.instruction:
-            # Qwen3-Reranker ships with a web-search prompt. Passing prompt here
-            # replaces it with the Thai Words writer-oriented relevance task.
             predict_kwargs["prompt"] = self.instruction
 
         raw_scores = self.model.predict(pairs, **predict_kwargs)
@@ -210,10 +282,11 @@ def annotate_reranker_scores(
 def rank_v4_candidates(
     candidates: list[dict[str, Any]],
     *,
-    mode: str = "protected",
+    mode: str = "commonness",
     top_k: int = 20,
     v25_weight: float = 0.35,
     reranker_weight: float = 1.0,
+    commonness_weight: float = 0.5,
     rrf_k: int = 20,
 ) -> list[dict[str, Any]]:
     if mode not in VALID_MODES:
@@ -230,7 +303,7 @@ def rank_v4_candidates(
         v25_rank = int(item["v25_rank"])
         reranker_rank = int(item["reranker_rank"])
 
-        if mode == "fusion":
+        if mode in {"fusion", "commonness"}:
             v4_score = weighted_rrf(
                 lexical_rank=v25_rank,
                 dense_rank=reranker_rank,
@@ -238,6 +311,10 @@ def rank_v4_candidates(
                 dense_weight=reranker_weight,
                 k=rrf_k,
             )
+            if mode == "commonness":
+                commonness_rank = item.get("commonness_rank")
+                if commonness_rank is not None:
+                    v4_score += commonness_weight / (rrf_k + int(commonness_rank))
         else:
             v4_score = reranker_score
 
@@ -254,7 +331,7 @@ def rank_v4_candidates(
                 item["word"],
             )
         )
-    elif mode == "fusion":
+    elif mode in {"fusion", "commonness"}:
         ranked.sort(
             key=lambda item: (
                 -float(item["v4_score"]),
@@ -283,6 +360,8 @@ def rank_v4_candidates(
 class V4Searcher:
     v25: HybridSearcher
     scorer: PairScorer
+    commonness: dict[str, int] | None = None
+    commonness_source: str = "none"
 
     def retrieve_and_score(
         self,
@@ -307,7 +386,12 @@ class V4Searcher:
             dense_weight=dense_weight,
             rrf_k=v25_rrf_k,
         )
-        return annotate_reranker_scores(query, candidates, self.scorer)
+        scored = annotate_reranker_scores(query, candidates, self.scorer)
+        return annotate_commonness(
+            scored,
+            self.commonness,
+            source=self.commonness_source,
+        )
 
     def search(
         self,
@@ -316,7 +400,7 @@ class V4Searcher:
         top_k: int = 20,
         sense: int | None = None,
         candidate_pool: int = 50,
-        mode: str = "protected",
+        mode: str = "commonness",
         lexical_pool: int = 300,
         dense_pool: int = 300,
         lexical_weight: float = 1.0,
@@ -324,6 +408,7 @@ class V4Searcher:
         v25_rrf_k: int = 60,
         v25_rank_weight: float = 0.35,
         reranker_rank_weight: float = 1.0,
+        commonness_rank_weight: float = 0.5,
         v4_rrf_k: int = 20,
     ) -> list[dict[str, Any]]:
         scored = self.retrieve_and_score(
@@ -342,5 +427,6 @@ class V4Searcher:
             top_k=top_k,
             v25_weight=v25_rank_weight,
             reranker_weight=reranker_rank_weight,
+            commonness_weight=commonness_rank_weight,
             rrf_k=v4_rrf_k,
         )
