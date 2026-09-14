@@ -186,10 +186,10 @@ def _load_model(model_id: str, *, four_bit: bool):
             bnb_4bit_use_double_quant=True,
             bnb_4bit_compute_dtype=torch.float16,
         )
-        kwargs["torch_dtype"] = torch.float16
+        kwargs["dtype"] = torch.float16
     else:
         if torch.cuda.is_bf16_supported():
-            kwargs["torch_dtype"] = torch.bfloat16
+            kwargs["dtype"] = torch.bfloat16
         else:
             kwargs["torch_dtype"] = torch.float16
 
