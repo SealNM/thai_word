@@ -1,6 +1,6 @@
 # V5 — Listwise Lexical Ranking
 
-Status: **V5.2 pilot complete; model-hopping paused, V5.3 rarity-penalty reranking proposed**
+Status: **V5.2 pilot complete; V5.3 Gemma 4 experiment selected before rarity-penalty work**
 
 Branch: `feat/dictionary-semantic-v5-listwise-ranker`
 
@@ -480,3 +480,68 @@ Primary expected effect:
 - Preserve Jina's semantic win on `เดิน`, where `วิ่ง` already ranks below direct walking alternatives.
 
 This is now preferred over testing another local reranker model.
+
+
+## V5.3 priority change — test Google's current Gemma 4 before rarity penalties
+
+User preference: because V2.5 already works well with Google's EmbeddingGemma, test the current Gemma family before committing to heuristic rarity penalties.
+
+Current Google release research (September 2026):
+- Gemma 4 is newer than the Gemma 3 / Gemma 3n / T5Gemma 2 generation.
+- Google released Gemma 4 in March 2026 and a 12B Unified variant in June 2026.
+- The smallest instruction model is `google/gemma-4-E2B-it`.
+- E2B has ~2.3B effective parameters (~5.1B total including per-layer embeddings), 128K context, multilingual pretraining over 140+ languages, native system-role support, and optional thinking mode.
+- Gemma 4 is Apache-2.0, which is materially better for a future production path than the research-only Jina / ContextualAI licenses.
+- Full BF16 E2B checkpoint is ~10.2 GB.
+- Google also publishes an official 8-bit mobile-Transformers checkpoint:
+  `google/gemma-4-E2B-it-qat-mobile-transformers`
+  at ~2.46 GB, making it the preferred first Colab experiment.
+- Google also publishes an official Q4 GGUF (~3.35 GB text weights), but introducing llama.cpp is unnecessary for the first experiment.
+
+### Why Gemma 4 E2B is worth a clean test
+
+This is not another reranker-model swap. Gemma 4 is a newer instruction model with:
+- native system instructions;
+- substantially stronger general language/instruction capability than the tiny Qwen3.5-0.8B experiment;
+- a direct lineage with the Gemma family already successful in V2.5 retrieval;
+- an official compact quantized checkpoint suitable for local experimentation.
+
+### V5.3 experiment design
+
+Do **not** ask Gemma 4 to emit a full permutation of 50 candidates.
+
+Run two clean modes on the exact same V2.5 top-50 pools:
+
+1. **Gemma-direct**
+   - Gemma sees all top-50 candidates.
+   - Ask only for the best 10 candidate IDs.
+   - Thinking disabled for latency.
+   - Native system prompt carries the Thai Words ranking policy.
+   - Strict parser diagnostics; no silent fallback when fewer than 10 explicit IDs are returned.
+
+2. **Jina -> Gemma judge**
+   - Jina v3.5 first narrows the V2.5 top-50 to a semantic top-20.
+   - Gemma 4 sees those 20 and returns the best 10.
+   - Purpose: preserve Jina's semantic wins such as `เดิน` while letting Gemma decide common-vs-rare ordering inside the semantically credible band.
+
+Primary model:
+- `google/gemma-4-E2B-it-qat-mobile-transformers` (official 8-bit, ~2.46 GB)
+
+Control only if mobile checkpoint compatibility becomes a problem:
+- `google/gemma-4-E2B-it` BF16 (~10.2 GB)
+
+Generation:
+- thinking OFF;
+- follow Gemma 4 recommended sampling defaults unless deterministic ranking proves stable;
+- request only top 10 IDs;
+- keep raw output + explicit-ID count in evaluation logs.
+
+Decision questions:
+- Does `บ้าน` move toward `เรือน / บ้านเรือน / บ้านช่อง` before `วาสะ / เวศม์ / อธิวาส`?
+- Does `สวย` prefer `งาม / งดงาม` over rare dictionary forms?
+- Does `เร็ว` prefer `ไว / รวดเร็ว / ด่วน` over `รยะ / สีฆ- / เชาว์`?
+- Can Gemma preserve Jina's improvements on `เดิน / ฝน` without introducing `วิ่ง / น้ำตก / เมฆ` too high?
+- Is output formatting reliable enough for top-10 structured ranking?
+- Is latency acceptable relative to Jina (~3.13s/query)?
+
+Rarity-penalty V5.3 work is postponed and becomes V5.4 only if Gemma 4 does not solve the product-specific common-vs-rare ordering sufficiently.
