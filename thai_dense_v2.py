@@ -54,9 +54,10 @@ MODEL_PROFILES: dict[str, dict[str, Any]] = {
     "qwen3-embedding-0.6b-256": {
         "model_id": "Qwen/Qwen3-Embedding-0.6B",
         "trust_remote_code": False,
-        "query_prefix": f"Instruct: {QWEN3_THAI_LEXICAL_TASK}\nQuery:",
+        "query_prefix": f"Instruct: {QWEN3_THAI_LEXICAL_TASK}\nQuery: ",
         "document_prefix": "",
         "truncate_dim": 256,
+        "max_seq_length": 512,
     },
     "arctic-embed-m-v2-256": {
         "model_id": "Snowflake/snowflake-arctic-embed-m-v2.0",
@@ -64,6 +65,7 @@ MODEL_PROFILES: dict[str, dict[str, Any]] = {
         "query_prefix": "query: ",
         "document_prefix": "",
         "truncate_dim": 256,
+        "max_seq_length": 512,
     },
     "gte-base-experimental": {
         "model_id": "Alibaba-NLP/gte-multilingual-base",
@@ -215,7 +217,12 @@ def load_model(profile: dict[str, Any], device: str | None = None):
     effective_device = resolve_device(device)
     if effective_device:
         kwargs["device"] = effective_device
-    return SentenceTransformer(profile["model_id"], **kwargs)
+
+    encoder = SentenceTransformer(profile["model_id"], **kwargs)
+    max_seq_length = profile.get("max_seq_length")
+    if max_seq_length is not None:
+        encoder.max_seq_length = int(max_seq_length)
+    return encoder
 
 
 def _encode_documents(
@@ -296,6 +303,7 @@ def build_dense_index(
         "query_method": profile.get("query_method", "encode"),
         "document_method": profile.get("document_method", "encode"),
         "truncate_dim": profile.get("truncate_dim"),
+        "max_seq_length": profile.get("max_seq_length"),
         "normalized": True,
         "rows": int(embeddings.shape[0]),
         "dimensions": int(embeddings.shape[1]),
@@ -348,6 +356,7 @@ class DenseEncoder:
             "query_method": metadata.get("query_method", "encode"),
             "document_method": metadata.get("document_method", "encode"),
             "truncate_dim": metadata.get("truncate_dim"),
+            "max_seq_length": metadata.get("max_seq_length"),
         }
         self.model = load_model(profile, device=device)
 
