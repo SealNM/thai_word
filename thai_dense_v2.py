@@ -155,6 +155,14 @@ def resolve_device(device: str | None) -> str | None:
     return requested
 
 
+def _resolve_hf_token() -> str | None:
+    try:
+        from huggingface_hub import get_token
+    except ImportError:
+        return None
+    return get_token()
+
+
 def load_model(profile: dict[str, Any], device: str | None = None):
     try:
         from sentence_transformers import SentenceTransformer
@@ -167,6 +175,20 @@ def load_model(profile: dict[str, Any], device: str | None = None):
     kwargs: dict[str, Any] = {
         "trust_remote_code": bool(profile.get("trust_remote_code", False)),
     }
+
+    model_id = str(profile["model_id"])
+    hf_token = _resolve_hf_token()
+    is_local_model = Path(model_id).exists()
+    if model_id.startswith("google/embeddinggemma") and not is_local_model and not hf_token:
+        raise RuntimeError(
+            "EmbeddingGemma is a gated Hugging Face model, but this runtime is not "
+            "authenticated. Add/enable the Colab secret HF_TOKEN, load it into the "
+            "runtime (or call huggingface_hub.login), and make sure the same Hugging "
+            "Face account has accepted access to google/embeddinggemma-300m."
+        )
+    if hf_token:
+        kwargs["token"] = hf_token
+
     truncate_dim = profile.get("truncate_dim")
     if truncate_dim is not None:
         kwargs["truncate_dim"] = int(truncate_dim)
