@@ -15,6 +15,11 @@ from thai_lexical_v1 import SearchArtifacts, normalize_text
 
 DENSE_ARTIFACT_VERSION = 1
 
+QWEN3_THAI_LEXICAL_TASK = (
+    "Given a Thai dictionary query with its selected sense, retrieve Thai dictionary "
+    "entries that can substitute for the query while preserving meaning and grammatical role"
+)
+
 MODEL_PROFILES: dict[str, dict[str, Any]] = {
     "e5-small": {
         "model_id": "intfloat/multilingual-e5-small",
@@ -44,6 +49,20 @@ MODEL_PROFILES: dict[str, dict[str, Any]] = {
         "document_prefix": "",
         "query_method": "encode_query",
         "document_method": "encode_document",
+        "truncate_dim": 256,
+    },
+    "qwen3-embedding-0.6b-256": {
+        "model_id": "Qwen/Qwen3-Embedding-0.6B",
+        "trust_remote_code": False,
+        "query_prefix": f"Instruct: {QWEN3_THAI_LEXICAL_TASK}\nQuery:",
+        "document_prefix": "",
+        "truncate_dim": 256,
+    },
+    "arctic-embed-m-v2-256": {
+        "model_id": "Snowflake/snowflake-arctic-embed-m-v2.0",
+        "trust_remote_code": True,
+        "query_prefix": "query: ",
+        "document_prefix": "",
         "truncate_dim": 256,
     },
     "gte-base-experimental": {
