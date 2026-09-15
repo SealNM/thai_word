@@ -541,6 +541,7 @@ Current implementation:
 - [x] add a curated pool of 40 additional writer-oriented headwords, bringing the intended total to 50 target senses;
 - [x] spread the pool across nature/scene, emotion, motion/posture, speech, appearance/sensory, physical state, place/environment, expression/perception/mental concepts;
 - [x] add `inspect-targets` so every proposed headword is checked against the frozen V2.5 lexical artifact before its sense is frozen;
+- [x] add `freeze-targets` so a reviewed sense report becomes an explicit frozen benchmark config without hand-editing query JSON;
 - [ ] run `inspect-targets` on Colab/Kaggle and resolve every ambiguous/missing headword;
 - [ ] freeze the resulting 50 target senses;
 - [ ] export 30 V2.5 candidates per newly frozen target sense;
@@ -563,6 +564,18 @@ A target is marked:
 - `missing_headword` when the proposed form is not an exact dictionary headword.
 
 Do not export Phase 2 candidates until all 40 new targets have a verified intended sense.
+
+
+After reviewing / filling every `recommended_sense` in the sense report, freeze the Phase-2 config:
+
+```bash
+python scripts/substitutability_benchmark.py freeze-targets \
+  --report evaluation/writer_relevance_phase2_sense_report.json \
+  --output evaluation/writer_relevance_phase2_frozen_queries.json
+```
+
+The freeze step refuses to continue if any target is missing a verified sense or if the selected sense is not present in the inspected dictionary senses.
+
 
 After the revised annotation schema is ready:
 
