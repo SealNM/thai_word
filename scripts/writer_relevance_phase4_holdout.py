@@ -263,9 +263,10 @@ def freeze_targets(args: argparse.Namespace) -> dict[str, Any]:
             "Re-run inspection; do not silently replace holdout headwords."
         )
 
+    decisions_path = getattr(args, "decisions", None)
     decisions = None
-    if args.decisions:
-        decisions = _read_json(args.decisions)
+    if decisions_path:
+        decisions = _read_json(decisions_path)
         report = apply_sense_decisions(
             report,
             decisions,
@@ -355,9 +356,9 @@ def freeze_targets(args: argparse.Namespace) -> dict[str, Any]:
         "headword_source_sha256": actual_config_hash,
         "sense_report_file": str(args.report),
         "sense_report_sha256": _sha256_file(args.report),
-        "sense_decisions_file": str(args.decisions) if args.decisions else None,
+        "sense_decisions_file": str(decisions_path) if decisions_path else None,
         "sense_decisions_sha256": (
-            _sha256_file(args.decisions) if args.decisions else None
+            _sha256_file(decisions_path) if decisions_path else None
         ),
         "old_targets_file": str(args.old_targets),
         "old_targets_sha256": _sha256_file(args.old_targets),

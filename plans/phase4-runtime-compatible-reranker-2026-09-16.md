@@ -1395,3 +1395,24 @@ Expected output:
 - `holdout_opened_for_model_evaluation=false`.
 
 Do not run learned/neural/hybrid evaluation on the 600 rows before annotation is complete and the labeled holdout is frozen.
+
+
+### Wave H freeze artifact integrity fix
+
+The first committed `writer_relevance_phase4_holdout_frozen_queries.json` was malformed due to a file-generation error in the commit step, not due to the sense-review workflow.
+
+Observed failures:
+
+- JSON parse error near the `เงา` record;
+- legacy unit-test namespace without `decisions` caused `AttributeError`.
+
+Fixes:
+
+- rebuilt the frozen target JSON from structured data using the reviewed sense decisions and inspected dictionary definitions;
+- restored the intended frozen-target SHA-256:
+  `f6c9fef35a556ecc306d67e42eea605ee85f804f21371595d22d1cca654fcd34`;
+- changed `freeze_targets()` to read the optional decisions argument with `getattr(args, "decisions", None)`, preserving compatibility with older/internal callers and tests;
+- manifest hash remains valid because it already recorded the intended structured frozen file hash;
+- no target, sense decision, model choice, candidate list, or quality-selection policy changed.
+
+This is an artifact-integrity/code-compatibility fix only.
