@@ -979,3 +979,43 @@ python scripts/build_dense_index.py \
 ```
 
 The writer learned artifact and Phase 3 neural checkpoint do not need to be rebuilt.
+
+
+### EmbeddingGemma gated-access incident on Kaggle
+
+The next Kaggle rebuild step failed while loading the unchanged V2.5 dense model:
+
+```text
+GatedRepoError: 401 Unauthorized
+google/embeddinggemma-300m
+```
+
+Verified cause:
+
+- `google/embeddinggemma-300m` is a gated Hugging Face model;
+- its repository metadata is public, but file access requires accepting Google's usage license;
+- the runtime must authenticate with a Hugging Face account that has accepted the license;
+- Hugging Face supports authentication through the `HF_TOKEN` environment variable or `hf auth login`.
+
+This is an access/authentication incident, not a model or code-quality regression.
+
+Policy:
+
+> Do **not** swap to another embedding model to bypass the gate. V2.5 was selected with `embeddinggemma-300m-256`; changing the embedding model would change the retrieval baseline.
+
+Build-script hardening:
+
+- `scripts/build_dense_index.py` now recognizes gated/401 model-access failures;
+- it emits a concise license/authentication instruction instead of a large HTTP traceback;
+- it reports whether `HF_TOKEN` is set without ever printing the token value;
+- it explicitly reminds operators that the V2.5 rebuild must remain on `embeddinggemma-300m-256`.
+
+Kaggle recovery flow:
+
+1. Open `https://huggingface.co/google/embeddinggemma-300m` while signed in.
+2. Accept Google's usage license for EmbeddingGemma.
+3. Create/use a Hugging Face read token for that same account.
+4. Put it in a private Kaggle secret, preferably named `HF_TOKEN`.
+5. Export the secret into the process environment before invoking the build command.
+6. Optionally verify authentication with `hf auth whoami`.
+7. Re-run the exact V2.5 dense-index build; no retraining or model-selection step is involved.
