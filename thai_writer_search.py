@@ -157,10 +157,6 @@ class WriterSearch:
     ) -> list[dict[str, Any]]:
         if top_k < 1:
             raise ValueError("top_k must be >= 1.")
-        if rerank_pool < top_k:
-            raise ValueError("rerank_pool must be >= top_k.")
-        if rerank_pool < 1:
-            raise ValueError("rerank_pool must be >= 1.")
 
         self.last_reranker_error = None
 
@@ -176,6 +172,11 @@ class WriterSearch:
                 dense_weight=dense_weight,
                 rrf_k=rrf_k,
             )
+
+        if rerank_pool < top_k:
+            raise ValueError("rerank_pool must be >= top_k.")
+        if rerank_pool < 1:
+            raise ValueError("rerank_pool must be >= 1.")
 
         v25_results = self._v25_search(
             query,

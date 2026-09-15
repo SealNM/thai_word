@@ -1,7 +1,7 @@
 # Thai Words — Phase 4 Runtime-Compatible Writer Reranker Plan
 
 Date: 2026-09-16  
-Status: **In progress — Waves A/B/C complete; Wave D WriterSearch wrapper implemented**  
+Status: **In progress — Waves A-F runtime integration implemented; Wave G performance gate pending**  
 Base commit: `959c502254529e7260fdbf98a615b0e4e7858145`  
 Working branch: `feat/phase4-runtime-compatible-reranker-2026-09-16`
 
@@ -790,3 +790,77 @@ python -m unittest discover \
 ```
 
 After this passes, Wave E/F can add explicit `off / optional / required` fallback behavior and the separate `scripts/search_writer.py` CLI without altering V2.5's existing CLI.
+
+
+## Waves E/F implementation checkpoint — fallback modes + writer CLI
+
+Wave D focused tests passed **9/9** on Kaggle.
+
+Observed real checkpoint warmup before Wave E/F:
+
+- checkpoint: `artifacts/phase3/bge-reranker-v2-m3-locked`
+- requested device: `cuda`
+- actual device: `cuda:0`
+- category mode: `omit`
+- runtime download: disabled
+- first model load component: **13.910393 s**
+
+This timing is carried forward as a Wave G runtime baseline, not a quality metric.
+
+### Wave E — fallback modes
+
+`WriterSearch` now supports:
+
+- `off` — raw V2.5 output; learned/neural rerankers are not required;
+- `optional` — attempt reranking, but return the unchanged V2.5 result ordering on artifact/scoring failure while exposing status/error on the searcher/CLI envelope;
+- `required` — reranker failures propagate as errors.
+
+Default for the new writer CLI is `optional`.
+
+The `off` path is evaluated before rerank-pool validation, so even `top_k > rerank_pool` behaves exactly like V2.5 because rerank_pool is irrelevant when reranking is disabled.
+
+### Wave F — writer CLI
+
+Added `scripts/search_writer.py` without modifying `scripts/search_v2.py`.
+
+Example:
+
+```bash
+python scripts/search_writer.py "ฝน" \
+  --index artifacts/v1 \
+  --dense-index artifacts/v2/embeddinggemma-300m-256 \
+  --learned-ranker artifacts/writer-reranker \
+  --neural-model artifacts/phase3/bge-reranker-v2-m3-locked \
+  --sense 1 \
+  --top-k 10 \
+  --rerank-pool 30 \
+  --reranker-mode optional \
+  --neural-device cuda \
+  --include-runtime
+```
+
+CLI envelope reports:
+
+- query/sense;
+- requested reranker mode;
+- `reranker_status`;
+- `reranker_error`;
+- results;
+- optional runtime metadata.
+
+`--list-senses` exits before `WriterSearch.from_paths`, so it cannot construct/load the writer reranker.
+
+Focused tests cover:
+
+- raw V2.5 equality in off mode;
+- off mode ignoring rerank-pool constraints;
+- optional runtime fallback;
+- optional initialization fallback;
+- required error propagation;
+- required component guard;
+- successful writer status;
+- invalid mode rejection;
+- list-senses bypassing WriterSearch construction;
+- CLI default mode = optional.
+
+Next: Wave G runtime profiling with real artifacts. No ranking parameter/model changes are permitted as part of that profiling.

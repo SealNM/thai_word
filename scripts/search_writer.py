@@ -43,13 +43,12 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main() -> None:
-    args = build_parser().parse_args()
-
+def run(args: argparse.Namespace):
     if args.list_senses:
         lexical = load_artifacts(args.index)
-        print(json.dumps(list_senses(lexical, args.query), ensure_ascii=False, indent=2))
-        return
+        payload = list_senses(lexical, args.query)
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return payload
 
     searcher = WriterSearch.from_paths(
         lexical_index=args.index,
@@ -86,6 +85,12 @@ def main() -> None:
         payload["runtime"] = searcher.runtime_info()
 
     print(json.dumps(payload, ensure_ascii=False, indent=2))
+    return payload
+
+
+def main() -> None:
+    args = build_parser().parse_args()
+    run(args)
 
 
 if __name__ == "__main__":

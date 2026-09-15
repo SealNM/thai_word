@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import unittest
+from unittest.mock import patch
 
+from scripts import search_writer
 from thai_writer_search import WriterSearch
 
 
@@ -128,6 +130,43 @@ class WriterSearchModesTests(unittest.TestCase):
 
         self.assertEqual(searcher.last_reranker_status, "writer_reranked")
         self.assertTrue(all(item["reranker_status"] == "writer_reranked" for item in results))
+
+    def test_off_mode_ignores_rerank_pool_size(self):
+        base = [_result("ก"), _result("ข")]
+        searcher = WriterSearch(v25=FakeV25(base), mode="off")
+
+        results = searcher.search("ฝน", top_k=2, rerank_pool=1)
+
+        self.assertEqual(results, base)
+        self.assertEqual(searcher.last_reranker_status, "off")
+
+    def test_cli_list_senses_bypasses_writer_search_construction(self):
+        args = search_writer.build_parser().parse_args(
+            [
+                "ฝน",
+                "--dense-index",
+                "unused-dense",
+                "--list-senses",
+            ]
+        )
+        with (
+            patch("scripts.search_writer.load_artifacts", return_value="LEXICAL"),
+            patch(
+                "scripts.search_writer.list_senses",
+                return_value=[{"sense": 1, "definition": "น้ำที่ตกจากเมฆ"}],
+            ),
+            patch("scripts.search_writer.WriterSearch.from_paths") as from_paths,
+        ):
+            payload = search_writer.run(args)
+
+        self.assertEqual(payload[0]["sense"], 1)
+        from_paths.assert_not_called()
+
+    def test_cli_default_mode_is_optional(self):
+        args = search_writer.build_parser().parse_args(
+            ["ฝน", "--dense-index", "unused-dense"]
+        )
+        self.assertEqual(args.reranker_mode, "optional")
 
     def test_invalid_mode_is_rejected(self):
         with self.assertRaises(ValueError):
