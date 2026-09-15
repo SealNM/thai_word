@@ -54,7 +54,7 @@ MODEL_PROFILES: dict[str, dict[str, Any]] = {
     "qwen3-embedding-0.6b-256": {
         "model_id": "Qwen/Qwen3-Embedding-0.6B",
         "trust_remote_code": False,
-        "query_prefix": f"Instruct: {QWEN3_THAI_LEXICAL_TASK}\nQuery: ",
+        "query_prefix": f"Instruct: {QWEN3_THAI_LEXICAL_TASK}\nQuery:",
         "document_prefix": "",
         "truncate_dim": 256,
         "max_seq_length": 512,
