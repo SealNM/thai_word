@@ -221,8 +221,13 @@ def _prompt_utility() -> int | str:
 def _prompt_relation(utility: int) -> str | None:
     severe = {"opposite_misleading", "sense_mismatch", "unrelated"}
     print("Relation:")
-    for index, relation in enumerate(ANNOTATION_RELATIONS, start=1):
-        print(f"  {index:>2}. {relation}")
+    relation_items = [
+        f"{index}={relation}"
+        for index, relation in enumerate(ANNOTATION_RELATIONS, start=1)
+    ]
+    midpoint = (len(relation_items) + 1) // 2
+    print("  " + " | ".join(relation_items[:midpoint]))
+    print("  " + " | ".join(relation_items[midpoint:]))
 
     while True:
         raw = input("เลือก relation (เลข, b=ย้อนกลับ utility): ").strip().lower()
@@ -308,6 +313,8 @@ def annotate_interactively(args: argparse.Namespace) -> None:
             continue
 
         previous_labeled = _is_labeled(row)
+        previous_utility = row["annotation"].get("utility")
+        previous_relation = row["annotation"].get("relation")
         row["annotation"]["utility"] = utility
         row["annotation"]["relation"] = relation
 
@@ -315,8 +322,8 @@ def annotate_interactively(args: argparse.Namespace) -> None:
         if row_errors:
             for error in row_errors:
                 print(f"ERROR: {error}", file=sys.stderr)
-            row["annotation"]["utility"] = None
-            row["annotation"]["relation"] = None
+            row["annotation"]["utility"] = previous_utility
+            row["annotation"]["relation"] = previous_relation
             continue
 
         write_jsonl(args.path, rows)
