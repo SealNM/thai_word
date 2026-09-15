@@ -1,6 +1,6 @@
 # V2.7 — Pairwise learned reranker distilled from an offline Gemma teacher
 
-Status: implementation ready for pilot. Branch from V2.5, not from V2.6.
+Status: rejected after frozen holdout evaluation. V2.5 remains the project baseline.
 
 ## Decision from V2.6
 
@@ -180,3 +180,35 @@ Keep V2.7 only if the frozen holdout shows a clear overall improvement over V2.5
 - improvements must appear across multiple held-out query types, not just one or two examples.
 
 If V2.7 is mixed, neutral, or worse, stop here and keep V2.5 as the project baseline rather than tuning this benchmark further.
+
+
+## Final holdout verdict — REJECTED
+
+The frozen 10-query benchmark was evaluated after training on 96 non-holdout anchors (9,984 pairwise examples; anchor-level validation accuracy 0.629555).
+
+V2.7 produced useful improvements in a few places:
+- สวย: งดงาม moved from #8 to #3;
+- เร็ว: รวดเร็ว moved from #9 to #5;
+- บ้าน: หมู่บ้าน moved from #8 to #2;
+- พูด: เอ่ย entered the top results.
+
+However, these gains were not consistent enough and were accompanied by clear lexical-validity regressions:
+- ฝน: เมฆ moved to #3;
+- เดิน: ชาย moved to #7;
+- สวย: ดี moved to #5;
+- รัก: ชู้สาว and จอด entered the top 10;
+- พูด: พจน์ and ปาก entered the top 10 while several direct speech alternatives fell;
+- เร็ว: bound form สีฆ- entered the top 10;
+- กลัว: กระดก entered the top 10.
+
+This violates the original decision rule: associated / wrong-role / structurally awkward candidates must not become more prominent merely to improve common-first ordering.
+
+A scikit-learn persistence warning was observed because the model was trained with 1.9.1 and evaluated with 1.6.1. The evaluation still loaded and produced coherent scores, but the rejection does not depend on marginal score differences: multiple large, obvious semantic regressions are sufficient to fail the experiment.
+
+### Decision
+
+- Do not tune V2.7 on this benchmark.
+- Do not promote V2.7 to production/default.
+- Keep V2.5 (`feat/dictionary-semantic-v2-5-embeddinggemma`) as the strongest validated baseline.
+- Preserve V2.6/V2.7 branches and artifacts as research history only.
+- Pause ranking experiments here rather than overfitting further to the current 10-query benchmark.
