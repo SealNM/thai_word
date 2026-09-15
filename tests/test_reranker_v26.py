@@ -115,6 +115,39 @@ class V26RerankerTests(unittest.TestCase):
             2,
         )
 
+    def test_cascading_promotions_cannot_demote_one_candidate_without_bound(self):
+        results = [
+            item("rare-top", dense=0.80),
+            item("common-1", dense=0.799),
+            item("common-2", dense=0.798),
+            item("common-3", dense=0.797),
+            item("common-4", dense=0.796),
+        ]
+        reranked = rerank_v26(
+            results,
+            frequency_model=FakeFrequency(
+                {
+                    "rare-top": 0.01,
+                    "common-1": 0.90,
+                    "common-2": 0.90,
+                    "common-3": 0.90,
+                    "common-4": 0.90,
+                }
+            ),
+            config=V26Config(
+                rerank_window=5,
+                max_promotion=4,
+                max_demotion=2,
+                dense_similarity_tolerance=0.03,
+            ),
+        )
+        rare = next(x for x in reranked if x["word"] == "rare-top")
+        self.assertGreaterEqual(rare["v26"]["movement"], -2)
+        self.assertLessEqual(
+            max(abs(x["v26"]["movement"]) for x in reranked),
+            4,
+        )
+
     def test_bound_form_gets_structural_penalty(self):
         penalties = structural_penalties(
             item("วัส-", dense=0.7, lexical_form="bound_form")

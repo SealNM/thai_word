@@ -19,10 +19,11 @@ Guards:
 1. no positive frequency boost;
 2. rerank only inside the first semantic window (default top 20 of V2.5 top 50);
 3. a candidate can improve by at most 4 positions;
-4. a weaker lexical-relation tier cannot jump over a stronger one;
-5. protected V2.5 relation buckets cannot be crossed;
-6. dense similarity must remain within a small tolerance (default 0.03) to pass a neighbor;
-7. direct lexical relations cap the rarity penalty so rare but valid synonyms remain visible.
+4. a candidate can be displaced downward by at most 4 positions;
+5. a weaker lexical-relation tier cannot jump over a stronger one;
+6. protected V2.5 relation buckets cannot be crossed;
+7. dense similarity must remain within a small tolerance (default 0.03) to pass a neighbor;
+8. direct lexical relations cap the rarity penalty so rare but valid synonyms remain visible.
 
 ## Frequency source
 
@@ -56,6 +57,7 @@ python -u scripts/evaluate_v26.py \
   --candidate-pool 50 \
   --rerank-window 20 \
   --max-promotion 4 \
+  --max-demotion 4 \
   --dense-similarity-tolerance 0.03 \
   --top-k 10 \
   --device cuda \
@@ -73,3 +75,18 @@ Primary inspection cases:
 ## Decision rule
 
 Keep V2.6 only if it improves common-first ordering without damaging semantic validity across the shared benchmark. If it does not beat V2.5 consistently, keep V2.5 unchanged and use the diagnostics to decide whether the next step should be a learned pairwise/listwise ranker trained on product-specific preferences.
+
+
+## First real pilot — invalidated by asymmetric bound bug
+
+The first 10-query pilot exposed an implementation bug in the intended bounded reranking policy. Promotion was capped at +4, but a candidate could be displaced by many independent promotions and therefore fall without a bound. Observable examples included `จรรจา(-9)`, `ลำยอง(-6)`, and `สีฆ-(-6)`.
+
+This means the first pilot cannot be used as the final quality verdict for V2.6.
+
+Correction:
+- add `max_demotion=4`;
+- block a swap when it would push the displaced candidate below that bound;
+- add a regression test where several common candidates try to cascade past one rare candidate;
+- rerun the same real benchmark before tuning TNC thresholds or abandoning the approach.
+
+The CPU fallback warning in the first pilot affects latency only; it does not explain the ranking issue.

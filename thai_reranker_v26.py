@@ -18,6 +18,7 @@ class V26Config:
     candidate_pool: int = 50
     rerank_window: int = 20
     max_promotion: int = 4
+    max_demotion: int = 4
     dense_similarity_tolerance: float = 0.03
     token_proxy_discount: float = 0.10
 
@@ -244,7 +245,8 @@ def rerank_v26(
     working = annotated[:window]
 
     # Stable bounded insertion/bubble pass. Every candidate may improve by at
-    # most max_promotion positions from its original V2.5 rank.
+    # most max_promotion positions, and no displaced candidate may fall by more
+    # than max_demotion positions from its original V2.5 rank.
     for index in range(1, len(working)):
         cursor = index
         while cursor > 0:
@@ -254,6 +256,12 @@ def rerank_v26(
             current_rank = cursor + 1
             if original_rank - current_rank >= config.max_promotion:
                 break
+
+            previous_original_rank = int(previous["v26"]["original_rank"])
+            previous_new_rank = cursor + 1
+            if previous_new_rank - previous_original_rank > config.max_demotion:
+                break
+
             if not _can_pass(candidate, previous, config=config):
                 break
             working[cursor - 1], working[cursor] = candidate, previous

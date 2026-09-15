@@ -38,6 +38,7 @@ def main() -> None:
     parser.add_argument("--candidate-pool", type=int, default=50)
     parser.add_argument("--rerank-window", type=int, default=20)
     parser.add_argument("--max-promotion", type=int, default=4)
+    parser.add_argument("--max-demotion", type=int, default=4)
     parser.add_argument(
         "--dense-similarity-tolerance",
         type=float,
@@ -62,6 +63,7 @@ def main() -> None:
         candidate_pool=args.candidate_pool,
         rerank_window=args.rerank_window,
         max_promotion=args.max_promotion,
+        max_demotion=args.max_demotion,
         dense_similarity_tolerance=args.dense_similarity_tolerance,
         token_proxy_discount=args.token_proxy_discount,
     )
@@ -80,6 +82,7 @@ def main() -> None:
             "candidate_pool": config.candidate_pool,
             "rerank_window": config.rerank_window,
             "max_promotion": config.max_promotion,
+            "max_demotion": config.max_demotion,
             "dense_similarity_tolerance": config.dense_similarity_tolerance,
             "token_proxy_discount": config.token_proxy_discount,
             "frequency_source": "PyThaiNLP Thai National Corpus (TNC)",
