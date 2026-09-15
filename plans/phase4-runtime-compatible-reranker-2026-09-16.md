@@ -1,7 +1,7 @@
 # Thai Words — Phase 4 Runtime-Compatible Writer Reranker Plan
 
 Date: 2026-09-16  
-Status: **In progress — Waves A-G complete; Wave H targets frozen, V2.5 candidate export pending**  
+Status: **In progress — Waves A-G complete; Wave H 600 V2.5 pairs exported, annotation pending**  
 Base commit: `959c502254529e7260fdbf98a615b0e4e7858145`  
 Working branch: `feat/phase4-runtime-compatible-reranker-2026-09-16`
 
@@ -1416,3 +1416,72 @@ Fixes:
 - no target, sense decision, model choice, candidate list, or quality-selection policy changed.
 
 This is an artifact-integrity/code-compatibility fix only.
+
+
+## Wave H candidate export complete — 600 unlabeled pairs
+
+The fresh holdout candidate export completed successfully on the frozen V2.5 artifacts.
+
+Recorded export:
+
+- target senses: **20**
+- candidates per target: **30**
+- pair count: **600**
+- candidate system: **V2.5**
+- candidate file: `evaluation/writer_relevance_phase4_holdout_annotations.jsonl`
+- candidate file SHA-256:
+  `93592bfaa38ade132f0699df856cd82e4c4f7e8c4dcf5f5f754073ed68d84328`
+- writer reranker used: **false**
+- quality selection performed: **false**
+- labels present: **false**
+- holdout opened for model evaluation: **false**
+
+The canonical export record is:
+
+- `evaluation/writer_relevance_phase4_holdout_export_manifest.json`
+
+The main holdout manifest is now marked `candidate_exported=true`; the preparation script will refuse to silently overwrite/re-export the same frozen holdout.
+
+### Annotation gate
+
+No learned/neural/hybrid evaluation may run on these 600 pairs before annotation is complete and the labeled file is frozen.
+
+Use the existing schema-v3 annotation tool, which autosaves and resumes:
+
+```bash
+python -m scripts.substitutability_benchmark annotate \
+  evaluation/writer_relevance_phase4_holdout_annotations.jsonl
+```
+
+For a safer one-query-at-a-time workflow:
+
+```bash
+python -m scripts.substitutability_benchmark annotate \
+  evaluation/writer_relevance_phase4_holdout_annotations.jsonl \
+  --query ทะเล
+```
+
+or label at most one query-sized batch at a time:
+
+```bash
+python -m scripts.substitutability_benchmark annotate \
+  evaluation/writer_relevance_phase4_holdout_annotations.jsonl \
+  --limit 30
+```
+
+During annotation:
+
+- judge writer usefulness independently of V2.5 rank;
+- do not run writer learned/neural/hybrid scores for assistance;
+- retain schema v3 utility / semantic relation / style tags;
+- severe relations `opposite_misleading`, `sense_mismatch`, `unrelated` must remain utility 0;
+- do not calculate model-comparison metrics yet.
+
+After all 600 rows are labeled:
+
+```bash
+python -m scripts.substitutability_benchmark validate \
+  evaluation/writer_relevance_phase4_holdout_annotations.jsonl
+```
+
+Only after full validation passes should the labeled holdout be frozen under a new SHA-256 and opened for a single controlled model-selection cycle.

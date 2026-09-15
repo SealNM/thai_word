@@ -1,0 +1,17 @@
+{
+  "status": "phase4_holdout_candidates_exported_unlabeled",
+  "schema_version": 3,
+  "target_file": "evaluation/writer_relevance_phase4_holdout_frozen_queries.json",
+  "target_file_sha256": "f6c9fef35a556ecc306d67e42eea605ee85f804f21371595d22d1cca654fcd34",
+  "source_manifest": "evaluation/writer_relevance_phase4_holdout_manifest.json",
+  "candidate_file": "evaluation/writer_relevance_phase4_holdout_annotations.jsonl",
+  "candidate_file_sha256": "93592bfaa38ade132f0699df856cd82e4c4f7e8c4dcf5f5f754073ed68d84328",
+  "target_count": 20,
+  "candidate_count_per_query": 30,
+  "pair_count": 600,
+  "candidate_system": "v2.5",
+  "writer_reranker_used": false,
+  "quality_selection_performed": false,
+  "labels_present": false,
+  "holdout_opened_for_model_evaluation": false
+}

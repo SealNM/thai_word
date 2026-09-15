@@ -21,6 +21,7 @@ OLD_TARGET_FILE = Path("evaluation/writer_relevance_50_targets.json")
 DECISIONS_FILE = Path("evaluation/writer_relevance_phase4_holdout_sense_decisions.json")
 FROZEN_FILE = Path("evaluation/writer_relevance_phase4_holdout_frozen_queries.json")
 MANIFEST_FILE = Path("evaluation/writer_relevance_phase4_holdout_manifest.json")
+EXPORT_MANIFEST_FILE = Path("evaluation/writer_relevance_phase4_holdout_export_manifest.json")
 
 
 class Phase4HoldoutTests(unittest.TestCase):
@@ -75,10 +76,35 @@ class Phase4HoldoutTests(unittest.TestCase):
         self.assertEqual(frozen["expected_pair_count"], EXPECTED_PAIR_COUNT)
         self.assertEqual(manifest["target_count"], TARGET_COUNT)
         self.assertEqual(manifest["expected_pair_count"], EXPECTED_PAIR_COUNT)
-        self.assertFalse(manifest["candidate_exported"])
+        self.assertTrue(manifest["candidate_exported"])
         self.assertFalse(manifest["writer_reranker_used_for_target_selection"])
         self.assertFalse(manifest["writer_reranker_used_for_candidate_export"])
         self.assertFalse(manifest["quality_selection_performed"])
+        self.assertFalse(manifest["labels_present"])
+        self.assertFalse(manifest["holdout_opened_for_model_evaluation"])
+
+    def test_export_manifest_locks_600_unlabeled_v25_pairs(self) -> None:
+        export_manifest = json.loads(
+            EXPORT_MANIFEST_FILE.read_text(encoding="utf-8")
+        )
+        manifest = json.loads(MANIFEST_FILE.read_text(encoding="utf-8"))
+
+        self.assertEqual(export_manifest["target_count"], TARGET_COUNT)
+        self.assertEqual(export_manifest["candidate_count_per_query"], 30)
+        self.assertEqual(export_manifest["pair_count"], EXPECTED_PAIR_COUNT)
+        self.assertEqual(export_manifest["candidate_system"], "v2.5")
+        self.assertEqual(
+            export_manifest["candidate_file_sha256"],
+            "93592bfaa38ade132f0699df856cd82e4c4f7e8c4dcf5f5f754073ed68d84328",
+        )
+        self.assertFalse(export_manifest["writer_reranker_used"])
+        self.assertFalse(export_manifest["quality_selection_performed"])
+        self.assertFalse(export_manifest["labels_present"])
+        self.assertFalse(export_manifest["holdout_opened_for_model_evaluation"])
+        self.assertEqual(
+            manifest["candidate_file_sha256"],
+            export_manifest["candidate_file_sha256"],
+        )
 
     def test_apply_decisions_rejects_sense_not_in_inspection(self) -> None:
         decisions = json.loads(DECISIONS_FILE.read_text(encoding="utf-8"))

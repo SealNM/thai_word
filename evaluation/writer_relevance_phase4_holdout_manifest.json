@@ -1,5 +1,5 @@
 {
-  "status": "phase4_holdout_frozen_before_candidate_export",
+  "status": "phase4_holdout_candidates_exported_unlabeled",
   "schema_version": 3,
   "target_file": "evaluation/writer_relevance_phase4_holdout_frozen_queries.json",
   "target_file_sha256": "f6c9fef35a556ecc306d67e42eea605ee85f804f21371595d22d1cca654fcd34",
@@ -22,8 +22,13 @@
   "candidates_per_query": 30,
   "expected_pair_count": 600,
   "headword_overlap_with_original_50": 0,
-  "candidate_exported": false,
+  "candidate_exported": true,
   "writer_reranker_used_for_target_selection": false,
   "writer_reranker_used_for_candidate_export": false,
-  "quality_selection_performed": false
+  "quality_selection_performed": false,
+  "candidate_file": "evaluation/writer_relevance_phase4_holdout_annotations.jsonl",
+  "candidate_file_sha256": "93592bfaa38ade132f0699df856cd82e4c4f7e8c4dcf5f5f754073ed68d84328",
+  "export_manifest_file": "evaluation/writer_relevance_phase4_holdout_export_manifest.json",
+  "labels_present": false,
+  "holdout_opened_for_model_evaluation": false
 }
