@@ -1,6 +1,6 @@
 # V2.6 — Lightweight bounded reranker
 
-Status: implementation started from \`feat/dictionary-semantic-v2-5-embeddinggemma\`.
+Status: **rejected after corrected 10-query pilot; V2.5 remains the baseline.**
 
 ## Baseline decision
 
@@ -90,3 +90,25 @@ Correction:
 - rerun the same real benchmark before tuning TNC thresholds or abandoning the approach.
 
 The CPU fallback warning in the first pilot affects latency only; it does not explain the ranking issue.
+
+
+## Final corrected pilot verdict
+
+After fixing the asymmetric movement bug, the reranker respected the intended +/-4 movement bound.
+
+Observed useful movements included:
+- เดิน: ย่าง / ย่างเท้า improved relative to ย่างตีน;
+- สวย: งดงาม moved upward strongly;
+- บ้าน: หมู่บ้าน improved;
+- มืด: มืดมน entered the top 10.
+
+However, the improvement was inconsistent:
+- TNC rarity did not reliably distinguish lexical substitutes from merely related words;
+- some rare forms still moved upward;
+- some useful direct alternatives moved down;
+- important common-first failures such as บ้าน remained largely unresolved.
+
+Decision:
+- reject V2.6 as a replacement for V2.5;
+- do not tune TNC thresholds further on the 10-query benchmark;
+- keep the branch as research history.
