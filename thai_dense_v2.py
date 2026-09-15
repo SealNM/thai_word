@@ -66,6 +66,9 @@ MODEL_PROFILES: dict[str, dict[str, Any]] = {
         "document_prefix": "",
         "truncate_dim": 256,
         "max_seq_length": 512,
+        "config_kwargs": {
+            "use_memory_efficient_attention": False,
+        },
     },
     "gte-base-experimental": {
         "model_id": "Alibaba-NLP/gte-multilingual-base",
@@ -214,6 +217,10 @@ def load_model(profile: dict[str, Any], device: str | None = None):
     if truncate_dim is not None:
         kwargs["truncate_dim"] = int(truncate_dim)
 
+    config_kwargs = profile.get("config_kwargs")
+    if config_kwargs:
+        kwargs["config_kwargs"] = dict(config_kwargs)
+
     effective_device = resolve_device(device)
     if effective_device:
         kwargs["device"] = effective_device
@@ -304,6 +311,7 @@ def build_dense_index(
         "document_method": profile.get("document_method", "encode"),
         "truncate_dim": profile.get("truncate_dim"),
         "max_seq_length": profile.get("max_seq_length"),
+        "config_kwargs": profile.get("config_kwargs"),
         "normalized": True,
         "rows": int(embeddings.shape[0]),
         "dimensions": int(embeddings.shape[1]),
