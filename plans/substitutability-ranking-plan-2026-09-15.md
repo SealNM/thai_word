@@ -1,7 +1,7 @@
 # Thai Words — Writer Lexical Relevance & Utility Ranking Plan
 
 Date: 2026-09-15  
-Status: **In progress — Phase 3 candidate locked; checkpoint verified; frozen benchmark ready**  
+Status: **Phase 3 complete — frozen benchmark opened once; locked hybrid retained without post-benchmark tuning**  
 Baseline: `feat/dictionary-semantic-v2-5-embeddinggemma`  
 Working branch: `feat/dictionary-substitutability-benchmark`
 
@@ -1297,3 +1297,71 @@ The main known validation failure case remains `ห้อง#1`, where the locke
 Decision:
 
 > Artifact persistence is verified. The Phase 3 candidate remains **fine-tuned BGE + learned baseline, alpha=0.5**. The frozen benchmark is now ready for its single intended evaluation. No further validation-driven tuning is allowed before running it.
+
+
+### Final frozen benchmark — Phase 3
+
+The frozen 10-query / 300-pair benchmark was opened once on **2026-09-16** using the previously locked configuration:
+
+- candidate: fine-tuned `BAAI/bge-reranker-v2-m3` + learned baseline;
+- locked alpha: **0.5**;
+- no benchmark-time model selection;
+- no benchmark-time alpha search or reselection;
+- dataset SHA-256 matched the frozen manifest;
+- benchmark evaluation count for this Phase 3 candidate: **1**.
+
+Aggregate benchmark result:
+
+| Method | Useful@10 | HighUtility@10 | Noise@10 | SevereError@10 | Diversity | NDCG@10 | MRR |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| V2.5 | 0.940 | 0.870 | 0.060 | 0.060 | 2.6 | 0.820388 | 1.00 |
+| learned baseline | 0.950 | 0.860 | 0.050 | 0.050 | 2.6 | 0.816868 | 0.95 |
+| fine-tuned BGE only | 0.980 | **0.950** | 0.020 | 0.020 | **2.9** | 0.842328 | 1.00 |
+| **locked hybrid** | **0.990** | 0.940 | **0.010** | **0.010** | 2.8 | **0.857411** | **1.00** |
+
+Locked hybrid vs V2.5:
+
+- Useful@10: **+0.05**
+- HighUtility@10: **+0.07**
+- Noise@10: **-0.05**
+- SevereError@10: **-0.05**
+- relation diversity: **+0.20**
+- NDCG@10: **+0.037023**
+- MRR: unchanged at **1.0**
+
+Important generalization finding:
+
+- the validation learned baseline did **not** generalize above V2.5 on benchmark NDCG (`0.816868 < 0.820388`) and also reduced MRR to `0.95`;
+- the fine-tuned BGE alone did generalize above both V2.5 and the learned baseline (`NDCG 0.842328`) while sharply reducing noise/severe errors;
+- the locked hybrid produced the best aggregate NDCG (**0.857411**) and strongest safety (**1% Noise/SevereError**);
+- this supports the Phase 3 architecture conclusion that the neural writer-utility signal adds real out-of-sample value and that blending it with the bounded learned baseline remains useful.
+
+Per-query NDCG for locked hybrid vs V2.5:
+
+- wins: **5/10** — `ฝัน#2`, `มอง#1`, `ยืน#1`, `ร้อน#1`, `เย็น#2`;
+- ties: **2/10** — `ยิ้ม#1`, `ร้องไห้#1`;
+- losses: **3/10** — `นั่ง#1`, `หนาว#1`, `หัวเราะ#1`.
+
+Largest benchmark improvements over V2.5:
+
+- `ยืน#1`: **+0.209103 NDCG**
+- `มอง#1`: **+0.112389**
+- `ร้อน#1`: **+0.076302**
+
+Largest benchmark regressions vs V2.5:
+
+- `หนาว#1`: **-0.061160**
+- `หัวเราะ#1`: **-0.036355**
+- `นั่ง#1`: **-0.013144**
+
+The hybrid also beats the fine-tuned neural-only ranker on aggregate NDCG by **+0.015084**, though neural-only is slightly higher on HighUtility@10 (**0.95 vs 0.94**) and relation diversity (**2.9 vs 2.8**).
+
+Phase 3 decision:
+
+> Keep the locked **V2.5 retrieval -> learned baseline + fine-tuned BGE hybrid (alpha=0.5)** as the selected Phase 3 ranking architecture.
+
+The benchmark is now consumed. **Do not tune alpha, model architecture, learning rate, epoch count, feature set, or thresholds against these 10 benchmark queries.** Any future ranking/model iteration that needs unbiased model selection must introduce a new holdout set.
+
+A compact archival summary is stored at:
+
+- `evaluation/writer_relevance_phase3_frozen_benchmark_summary.json`

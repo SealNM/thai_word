@@ -1,0 +1,126 @@
+{
+  "status": "final_frozen_benchmark_phase3_summary",
+  "date": "2026-09-16",
+  "dataset_sha256": "6e767583302a6df75c9b76d86fc73cbda150c98fbbe7c95b912a650a04a1a515",
+  "benchmark_query_count": 10,
+  "benchmark_pair_count": 300,
+  "model": "BAAI/bge-reranker-v2-m3",
+  "locked_alpha": 0.5,
+  "selection_performed_on_benchmark": false,
+  "alpha_reselected_on_benchmark": false,
+  "metrics": {
+    "v25": {
+      "useful_rate_at_k_mean": 0.94,
+      "high_utility_rate_at_k_mean": 0.87,
+      "noise_rate_at_k_mean": 0.06,
+      "severe_error_rate_at_k_mean": 0.06,
+      "relation_diversity_at_k_mean": 2.6,
+      "ndcg_at_k_mean": 0.8203878547824817,
+      "mrr_high_utility_mean": 1
+    },
+    "learned_baseline": {
+      "useful_rate_at_k_mean": 0.95,
+      "high_utility_rate_at_k_mean": 0.86,
+      "noise_rate_at_k_mean": 0.05,
+      "severe_error_rate_at_k_mean": 0.05,
+      "relation_diversity_at_k_mean": 2.6,
+      "ndcg_at_k_mean": 0.8168677965190364,
+      "mrr_high_utility_mean": 0.95
+    },
+    "neural_only": {
+      "useful_rate_at_k_mean": 0.98,
+      "high_utility_rate_at_k_mean": 0.95,
+      "noise_rate_at_k_mean": 0.02,
+      "severe_error_rate_at_k_mean": 0.02,
+      "relation_diversity_at_k_mean": 2.9,
+      "ndcg_at_k_mean": 0.8423276139070348,
+      "mrr_high_utility_mean": 1
+    },
+    "locked_hybrid": {
+      "useful_rate_at_k_mean": 0.99,
+      "high_utility_rate_at_k_mean": 0.94,
+      "noise_rate_at_k_mean": 0.01,
+      "severe_error_rate_at_k_mean": 0.01,
+      "relation_diversity_at_k_mean": 2.8,
+      "ndcg_at_k_mean": 0.8574111838255352,
+      "mrr_high_utility_mean": 1
+    }
+  },
+  "delta_hybrid_vs_v25": {
+    "useful_rate_at_k_mean": 0.05,
+    "high_utility_rate_at_k_mean": 0.07,
+    "noise_rate_at_k_mean": -0.05,
+    "severe_error_rate_at_k_mean": -0.05,
+    "relation_diversity_at_k_mean": 0.2,
+    "ndcg_at_k_mean": 0.0370233290430535,
+    "mrr_high_utility_mean": 0
+  },
+  "delta_hybrid_vs_learned": {
+    "useful_rate_at_k_mean": 0.04,
+    "high_utility_rate_at_k_mean": 0.08,
+    "noise_rate_at_k_mean": -0.04,
+    "severe_error_rate_at_k_mean": -0.04,
+    "relation_diversity_at_k_mean": 0.2,
+    "ndcg_at_k_mean": 0.04054338730649876,
+    "mrr_high_utility_mean": 0.05
+  },
+  "delta_hybrid_vs_neural": {
+    "useful_rate_at_k_mean": 0.01,
+    "high_utility_rate_at_k_mean": -0.01,
+    "noise_rate_at_k_mean": -0.01,
+    "severe_error_rate_at_k_mean": -0.01,
+    "relation_diversity_at_k_mean": -0.1,
+    "ndcg_at_k_mean": 0.01508356991850035,
+    "mrr_high_utility_mean": 0
+  },
+  "per_query_ndcg_summary": {
+    "vs_v25": {
+      "wins": 5,
+      "ties": 2,
+      "losses": 3,
+      "loss_queries": [
+        "นั่ง#1",
+        "หนาว#1",
+        "หัวเราะ#1"
+      ]
+    },
+    "vs_learned_baseline": {
+      "wins": 6,
+      "ties": 2,
+      "losses": 2,
+      "loss_queries": [
+        "หนาว#1",
+        "หัวเราะ#1"
+      ]
+    },
+    "vs_neural_only": {
+      "wins": 7,
+      "ties": 2,
+      "losses": 1,
+      "loss_queries": [
+        "นั่ง#1"
+      ]
+    }
+  },
+  "per_query_hybrid_vs_v25_ndcg_delta": {
+    "นั่ง#1": -0.013143901142570802,
+    "ฝัน#2": 0.029971365800749883,
+    "มอง#1": 0.11238937774301361,
+    "ยิ้ม#1": 0,
+    "ยืน#1": 0.2091032096465577,
+    "ร้องไห้#1": 0,
+    "ร้อน#1": 0.07630214569196747,
+    "หนาว#1": -0.061160169752180416,
+    "หัวเราะ#1": -0.03635473611368667,
+    "เย็น#2": 0.05312599855668476
+  },
+  "conclusion": {
+    "aggregate_ndcg_best": "locked_hybrid",
+    "aggregate_safety_best": "locked_hybrid",
+    "learned_baseline_ndcg_below_v25": true,
+    "neural_signal_generalizes": true,
+    "phase3_candidate_locked": true,
+    "post_benchmark_tuning_forbidden": true,
+    "future_changes_require_new_holdout": true
+  }
+}
