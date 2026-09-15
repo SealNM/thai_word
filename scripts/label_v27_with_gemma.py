@@ -124,6 +124,17 @@ class GemmaTeacher:
                 "with AutoModelForMultimodalLM plus accelerate."
             ) from exc
 
+        if (
+            device
+            and str(device).lower().startswith("cuda")
+            and not torch.cuda.is_available()
+        ):
+            raise RuntimeError(
+                "CUDA was requested for the V2.7 Gemma teacher, but "
+                "torch.cuda.is_available() is False. Enable a GPU runtime "
+                "and install a CUDA-enabled PyTorch build before labeling."
+            )
+
         self.torch = torch
         self.model_id = model_id
         self.max_new_tokens = max(
