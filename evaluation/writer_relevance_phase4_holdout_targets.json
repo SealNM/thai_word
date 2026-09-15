@@ -1,0 +1,157 @@
+{
+  "description": "Phase-4 fresh holdout target headwords. Headword selection is frozen before sense resolution and before any candidate/model output is inspected.",
+  "status": "headwords_frozen_senses_pending",
+  "selected_date": "2026-09-16",
+  "policy": {
+    "target_count": 20,
+    "candidates_per_query": 30,
+    "expected_pair_count": 600,
+    "group_balance": "5 targets in each of 4 writer-oriented groups",
+    "overlap_policy": "No headword may overlap the original frozen 50-target writer-relevance set.",
+    "selection_policy": "Targets are selected before Phase-4 candidate export and must not be replaced based on V2.5, learned, neural, or hybrid ranking quality.",
+    "sense_policy": "Sense IDs must be resolved only against the frozen V1 lexical artifact and reviewed before candidate export.",
+    "candidate_policy": "Candidates are exported from V2.5 only. Writer reranker output must not be used to choose or replace holdout targets."
+  },
+  "queries": [
+    {
+      "query": "ทะเล",
+      "sense": null,
+      "group": "noun_scene",
+      "category": "noun:nature/place",
+      "intended": "ทะเล / แหล่งน้ำเค็มขนาดใหญ่"
+    },
+    {
+      "query": "ภูเขา",
+      "sense": null,
+      "group": "noun_scene",
+      "category": "noun:nature/place",
+      "intended": "ภูเขา / พื้นดินที่สูงเด่นขึ้นเป็นเขา"
+    },
+    {
+      "query": "แม่น้ำ",
+      "sense": null,
+      "group": "noun_scene",
+      "category": "noun:nature/place",
+      "intended": "แม่น้ำ / ลำน้ำขนาดใหญ่"
+    },
+    {
+      "query": "ดอกไม้",
+      "sense": null,
+      "group": "noun_scene",
+      "category": "noun:nature/object",
+      "intended": "ดอกไม้ / ดอกของพืชที่ใช้กล่าวถึงเป็นวัตถุหรือภาพในฉาก"
+    },
+    {
+      "query": "เงา",
+      "sense": null,
+      "group": "noun_scene",
+      "category": "noun:light/scene",
+      "intended": "เงาที่เกิดจากแสงถูกบัง / shadow"
+    },
+    {
+      "query": "กอด",
+      "sense": null,
+      "group": "verb_action",
+      "category": "verb:action/contact",
+      "intended": "โอบด้วยแขน / embrace"
+    },
+    {
+      "query": "จูบ",
+      "sense": null,
+      "group": "verb_action",
+      "category": "verb:action/contact",
+      "intended": "ใช้ริมฝีปากแตะเพื่อแสดงความรักหรือความรู้สึก"
+    },
+    {
+      "query": "ก้ม",
+      "sense": null,
+      "group": "verb_action",
+      "category": "verb:posture/action",
+      "intended": "โน้มศีรษะหรือส่วนบนลง"
+    },
+    {
+      "query": "หัน",
+      "sense": null,
+      "group": "verb_action",
+      "category": "verb:motion/action",
+      "intended": "เปลี่ยนทิศหรือเบนหน้า/ตัวไปอีกทาง"
+    },
+    {
+      "query": "หลบ",
+      "sense": null,
+      "group": "verb_action",
+      "category": "verb:motion/action",
+      "intended": "เบี่ยงหรือเคลื่อนตัวให้พ้น/ซ่อนจากสิ่งหนึ่ง"
+    },
+    {
+      "query": "เงียบ",
+      "sense": null,
+      "group": "adjective_state",
+      "category": "adjective:sound/state",
+      "intended": "ไม่มีเสียงหรือสงบเสียง"
+    },
+    {
+      "query": "แห้ง",
+      "sense": null,
+      "group": "adjective_state",
+      "category": "adjective:state",
+      "intended": "ไม่มีหรือขาดความเปียกชื้น"
+    },
+    {
+      "query": "หนัก",
+      "sense": null,
+      "group": "adjective_state",
+      "category": "adjective:weight/state",
+      "intended": "มีน้ำหนักมาก / heavy"
+    },
+    {
+      "query": "เบา",
+      "sense": null,
+      "group": "adjective_state",
+      "category": "adjective:weight/state",
+      "intended": "มีน้ำหนักน้อย / light in weight"
+    },
+    {
+      "query": "หวาน",
+      "sense": null,
+      "group": "adjective_state",
+      "category": "adjective:taste/quality",
+      "intended": "มีรสหวาน / sweet"
+    },
+    {
+      "query": "คิดถึง",
+      "sense": null,
+      "group": "emotion_abstract",
+      "category": "emotion/mental",
+      "intended": "นึกถึงด้วยความผูกพันหรืออาลัยอยากพบ"
+    },
+    {
+      "query": "หวัง",
+      "sense": null,
+      "group": "emotion_abstract",
+      "category": "mental/abstract",
+      "intended": "คาดหมายหรือปรารถนาให้สิ่งหนึ่งเกิดขึ้น"
+    },
+    {
+      "query": "หึง",
+      "sense": null,
+      "group": "emotion_abstract",
+      "category": "emotion",
+      "intended": "รู้สึกหวงเมื่อเกรงว่าคนรักจะสนใจผู้อื่น"
+    },
+    {
+      "query": "สงสัย",
+      "sense": null,
+      "group": "emotion_abstract",
+      "category": "mental/abstract",
+      "intended": "ไม่แน่ใจและใคร่รู้ความจริง"
+    },
+    {
+      "query": "กังวล",
+      "sense": null,
+      "group": "emotion_abstract",
+      "category": "emotion/mental",
+      "intended": "รู้สึกเป็นห่วงหรือกระวนกระวาย"
+    }
+  ]
+}

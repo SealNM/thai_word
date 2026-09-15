@@ -1,7 +1,7 @@
 # Thai Words — Phase 4 Runtime-Compatible Writer Reranker Plan
 
 Date: 2026-09-16  
-Status: **In progress — Waves A-G complete; Wave H fresh holdout pending**  
+Status: **In progress — Waves A-G complete; Wave H headword set frozen, sense review pending**  
 Base commit: `959c502254529e7260fdbf98a615b0e4e7858145`  
 Working branch: `feat/phase4-runtime-compatible-reranker-2026-09-16`
 
@@ -1156,3 +1156,108 @@ Wave G is complete.
 Next:
 
 > Wave H — create and freeze a new 20-query / 600-pair holdout before any model, compression, distillation, alpha, feature, or architecture iteration.
+
+
+## Wave H checkpoint — fresh holdout headwords frozen
+
+A fresh 20-target holdout headword list has been selected **before** Phase-4 candidate/model output is inspected.
+
+The new set is stronger than the minimum no-query-sense-overlap rule: it has **zero headword overlap** with the original 50-target writer-relevance set.
+
+### Frozen headword groups
+
+#### noun / scene — 5
+
+- `ทะเล`
+- `ภูเขา`
+- `แม่น้ำ`
+- `ดอกไม้`
+- `เงา`
+
+#### verb / action — 5
+
+- `กอด`
+- `จูบ`
+- `ก้ม`
+- `หัน`
+- `หลบ`
+
+#### adjective / state — 5
+
+- `เงียบ`
+- `แห้ง`
+- `หนัก`
+- `เบา`
+- `หวาน`
+
+#### emotion / abstract — 5
+
+- `คิดถึง`
+- `หวัง`
+- `หึง`
+- `สงสัย`
+- `กังวล`
+
+Source:
+
+- `evaluation/writer_relevance_phase4_holdout_targets.json`
+
+Status of that file:
+
+```text
+headwords_frozen_senses_pending
+```
+
+The headword list must not be replaced because a candidate list looks weak/hard/easy.
+
+### Holdout preparation workflow
+
+Added:
+
+- `scripts/writer_relevance_phase4_holdout.py`
+- `tests/test_writer_relevance_phase4_holdout.py`
+
+The workflow has three explicit stages:
+
+```text
+inspect
+  -> human review of dictionary senses only
+freeze
+  -> immutable 20 target senses + hashes
+export
+  -> exactly 30 V2.5 candidates each = 600 unlabeled pairs
+```
+
+Safeguards:
+
+- exactly **20** targets;
+- exactly **5** targets in each of four groups;
+- no duplicate new headwords;
+- no headword overlap with `writer_relevance_50_targets.json`;
+- sense IDs must exist in the V1 lexical artifact;
+- target config hash is pinned during inspection/freeze;
+- frozen target file hash is checked again before candidate export;
+- export is exactly **30 V2.5 candidates × 20 = 600 pairs**;
+- candidate rows use `split=phase4_holdout`;
+- writer learned/neural/hybrid rerankers are not imported or used for target selection;
+- candidate export uses V2.5 only;
+- no quality metrics are calculated during preparation;
+- export manifest explicitly records `writer_reranker_used=false` and `holdout_opened_for_model_evaluation=false`.
+
+### Next gate — resolve dictionary senses
+
+Run on the existing Kaggle runtime where `artifacts/v1` is already available:
+
+```bash
+python -m scripts.writer_relevance_phase4_holdout inspect \
+  --config evaluation/writer_relevance_phase4_holdout_targets.json \
+  --old-targets evaluation/writer_relevance_50_targets.json \
+  --index artifacts/v1 \
+  --output evaluation/writer_relevance_phase4_holdout_sense_report.json
+```
+
+For targets with exactly one dictionary sense, the script fills `recommended_sense` automatically.
+
+For `needs_review` targets, review only the dictionary definitions and set `recommended_sense` in the sense report. Do **not** run candidate export or writer reranking before all 20 senses are pinned.
+
+Only after that review should `freeze` be run.
