@@ -542,8 +542,8 @@ Current implementation:
 - [x] spread the pool across nature/scene, emotion, motion/posture, speech, appearance/sensory, physical state, place/environment, expression/perception/mental concepts;
 - [x] add `inspect-targets` so every proposed headword is checked against the frozen V2.5 lexical artifact before its sense is frozen;
 - [x] add `freeze-targets` so a reviewed sense report becomes an explicit frozen benchmark config without hand-editing query JSON;
-- [ ] run `inspect-targets` on Colab/Kaggle and resolve every ambiguous/missing headword;
-- [ ] freeze the resulting 50 target senses;
+- [x] run `inspect-targets` on Colab/Kaggle and resolve every ambiguous/missing headword;
+- [x] freeze the 40 new target senses and the combined 50-target benchmark definition;
 - [ ] export 30 V2.5 candidates per newly frozen target sense;
 - [ ] annotate/review the expanded benchmark;
 - [ ] split by target/headword family into train/validation/frozen benchmark only after labels are complete.
@@ -575,6 +575,33 @@ python scripts/substitutability_benchmark.py freeze-targets \
 ```
 
 The freeze step refuses to continue if any target is missing a verified sense or if the selected sense is not present in the inspected dictionary senses.
+
+Approved Phase-2 sense resolution:
+- all **40/40** expansion headwords resolved;
+- no missing exact headwords;
+- `คลาน#1` selected for the general hand-and-knee crawling sense;
+- `ฝัน#2` selected for the verbal “see/experience a story while asleep” sense;
+- frozen expansion config: `evaluation/writer_relevance_phase2_frozen_queries.json`;
+- combined 50-target definition: `evaluation/writer_relevance_50_targets.json`.
+
+Export **only the 40 new targets** so the already-approved 300 pilot pairs are not regenerated:
+
+```bash
+python scripts/substitutability_benchmark.py export \
+  --config evaluation/writer_relevance_phase2_frozen_queries.json \
+  --index artifacts/v1 \
+  --dense-index artifacts/v2/embeddinggemma-300m-256 \
+  --candidates 30 \
+  --output evaluation/writer_relevance_phase2_annotations.jsonl
+```
+
+Expected output size: **1,200 unlabeled pairs** (40 targets x 30 candidates). Validate immediately after export:
+
+```bash
+python scripts/substitutability_benchmark.py validate \
+  evaluation/writer_relevance_phase2_annotations.jsonl \
+  --allow-unlabeled
+```
 
 
 After the revised annotation schema is ready:
