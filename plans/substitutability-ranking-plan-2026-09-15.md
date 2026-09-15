@@ -214,6 +214,26 @@ python scripts/substitutability_benchmark.py validate \
   --allow-unlabeled
 ```
 
+After validation, annotate one query at a time in Colab:
+
+```bash
+python scripts/substitutability_benchmark.py annotate \
+  evaluation/substitutability_annotations.jsonl \
+  --query ฝน
+```
+
+The interactive annotator:
+- shows query/candidate definitions and original V2.5 rank;
+- asks for Writer Utility `0..3`;
+- asks for one Writer Relevance relation;
+- autosaves after every completed pair;
+- resumes by skipping rows that already have valid labels;
+- supports `s` to skip and `q` to leave the session safely;
+- supports `--review` to revisit existing labels;
+- supports `--limit N` for short annotation sessions.
+
+Use per-query annotation first so the label policy can be reviewed after each 30-candidate block before scaling to the full benchmark.
+
 The schema has now been revised to Writer Relevance schema v2. Re-export the unlabeled pilot after pulling the latest branch before human labeling, because the first 300-row export used schema v1.
 
 ### Writer Relevance schema v2 status
@@ -236,7 +256,7 @@ Revised baseline metrics:
 
 The initial Colab file `evaluation/substitutability_annotations.jsonl` was exported before schema v2. It is unlabeled, so do not migrate it manually; pull the branch and re-run the export command to regenerate the same 300 V2.5 pairs with schema v2.
 
-Schema v2 test coverage now contains 8 cases covering:
+Schema v2 test coverage now contains 9 cases covering:
 - deterministic sense-pair IDs;
 - useful cross-role `manner_action`;
 - useful `scene_context`;
@@ -244,7 +264,8 @@ Schema v2 test coverage now contains 8 cases covering:
 - low-utility weak relations;
 - exported schema-v2 rows;
 - ambiguous target-sense pinning;
-- writer-utility ranking metrics including NDCG and severe-error counting.
+- writer-utility ranking metrics including NDCG and severe-error counting;
+- interactive annotation autosave/resume.
 
 The full suite should be re-run in the Colab/Kaggle environment after pulling this branch. The schema/metric logic was sanity-checked while implementing v2; the repository environment test run remains the final verification step.
 
