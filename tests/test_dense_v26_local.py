@@ -56,7 +56,10 @@ class DenseV26LocalEmbeddingTests(unittest.TestCase):
         self.assertEqual(profile["document_prefix"], "")
         self.assertEqual(
             profile["config_kwargs"],
-            {"use_memory_efficient_attention": False},
+            {
+                "use_memory_efficient_attention": False,
+                "unpad_inputs": False,
+            },
         )
 
     def test_local_challenger_documents_have_no_query_prefix(self) -> None:
