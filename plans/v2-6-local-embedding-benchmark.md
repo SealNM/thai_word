@@ -47,10 +47,10 @@ Documents remain unprefixed:
 
 The first benchmark uses 256d for a direct footprint comparison with V2.5.
 
-### 2. Snowflake Arctic Embed m v2.0 / 256d
+### 2. Snowflake Arctic Embed l v2.0 / 256d
 
 Model:
-- `Snowflake/snowflake-arctic-embed-m-v2.0`
+- `Snowflake/snowflake-arctic-embed-l-v2.0`
 - Apache-2.0
 - multilingual model with Thai explicitly covered in its language set
 - native 768d
@@ -67,8 +67,8 @@ The first benchmark uses the official 256d Matryoshka representation.
 - [x] Add `qwen3-embedding-0.6b-256` profile to `thai_dense_v2.py`.
 - [x] Add Thai Words-specific Qwen3 retrieval instruction.
 - [x] Keep Qwen instructions on query embeddings only.
-- [x] Add `arctic-embed-m-v2-256` profile.
-- [x] Use Arctic's official `query: ` prefix.
+- [x] Add `arctic-embed-l-v2-256` profile.
+- [x] Use Arctic-L's official `query: ` prefix.
 - [x] Keep documents unprefixed for both challengers.
 - [x] Use 256d Matryoshka truncation for a fair V2.5 comparison.
 - [x] Reuse the existing V2 dense-index builder.
@@ -76,11 +76,11 @@ The first benchmark uses the official 256d Matryoshka representation.
 - [x] Add no-model unit tests in `tests/test_dense_v26_local.py`.
 - [x] Run local profile tests.
 - [x] Build Qwen3 256d index.
-- [ ] Build Arctic 256d index.
+- [ ] Build Arctic-L 256d index.
 - [ ] Run shared 10-query evaluation against V2.5.
 - [ ] Inspect V3 holdout only after the 10-query pilot.
 - [ ] Record build time, model load time, and query latency.
-- [ ] If Arctic 256d wins materially, optionally compare its native 768d representation.
+- [ ] If Arctic-L 256d wins materially, optionally compare its native 768d representation.
 - [ ] If neither challenger beats V2.5, keep EmbeddingGemma and return focus to Gemma 4 reranking.
 
 ## Artifact paths
@@ -88,7 +88,7 @@ The first benchmark uses the official 256d Matryoshka representation.
 ```text
 artifacts/v2/embeddinggemma-300m-256
 artifacts/v26/qwen3-embedding-0.6b-256
-artifacts/v26/arctic-embed-m-v2-256
+artifacts/v26/arctic-embed-l-v2-256
 ```
 
 ## Colab test
@@ -113,13 +113,13 @@ No Gemini API key is required. The Hugging Face model is public; an HF token is 
 
 ```bash
 python -u scripts/build_dense_index.py \
-  --model arctic-embed-m-v2-256 \
-  --output artifacts/v26/arctic-embed-m-v2-256 \
-  --batch-size 64 \
+  --model arctic-embed-l-v2-256 \
+  --output artifacts/v26/arctic-embed-l-v2-256 \
+  --batch-size 32 \
   --device cuda
 ```
 
-Arctic uses `trust_remote_code=True` because the official model repository supplies its GTE model implementation.
+Arctic-L uses the native XLM-RoBERTa implementation and does not require `trust_remote_code=True`.
 
 ## Shared evaluation
 
@@ -127,7 +127,7 @@ Arctic uses `trust_remote_code=True` because the official model repository suppl
 python -u scripts/evaluate_v2.py \
   --dense-index artifacts/v2/embeddinggemma-300m-256 \
   --dense-index artifacts/v26/qwen3-embedding-0.6b-256 \
-  --dense-index artifacts/v26/arctic-embed-m-v2-256 \
+  --dense-index artifacts/v26/arctic-embed-l-v2-256 \
   --top-k 10 \
   --device cuda \
   --output artifacts/v26/local-embedding-benchmark.json
@@ -255,3 +255,22 @@ config_kwargs={
 This keeps standard padded attention end-to-end and avoids the incompatible gather/pad path. Model weights, query/document formatting, and 256d Matryoshka truncation remain unchanged.
 
 Operational note: a CUDA device-side assertion poisons the active CUDA context. Restart the Colab session/runtime before retrying after this error.
+
+
+## Arctic-M V2 compatibility decision
+
+The medium V2 checkpoint (`Snowflake/snowflake-arctic-embed-m-v2.0`) is removed from the primary benchmark path after two reproducible Colab CUDA failures on the first batch:
+1. its custom remote GTE code initially required optional xFormers because the published config enables memory-efficient attention;
+2. after disabling that path, the model still triggered a CUDA index/gather device-side assertion at batch 0, including with batch size 32.
+
+This is not an OOM signal and not a corpus-row-specific failure; it happens immediately on the first batch. The checkpoint's own Sentence Transformers metadata was produced with an older stack (Sentence Transformers 2.7.0.dev0, Transformers 4.39.3, PyTorch 2.1.0+cu121), while the current Colab benchmark environment uses a much newer stack. Rather than pinning the whole notebook to an old runtime or continuing to patch custom remote code, the benchmark substitutes `Snowflake/snowflake-arctic-embed-l-v2.0`.
+
+Why Arctic-L:
+- same Arctic Embed 2.0 multilingual family;
+- Thai is explicitly included in its 74-language model card;
+- Apache-2.0;
+- official 256d Matryoshka results;
+- native XLM-RoBERTa implementation, so no `trust_remote_code=True`;
+- similar non-embedding compute class (~303M non-embedding parameters), while being operationally much more portable.
+
+The medium profile remains in code only as an experimental/reference profile and is no longer required for the V2.6 decision.
