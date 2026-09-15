@@ -1,0 +1,48 @@
+{
+  "status": "approved_human_benchmark",
+  "k": 10,
+  "all": {
+    "query_count": 50,
+    "pair_count": 1500,
+    "useful_rate_at_k_mean": 0.94,
+    "high_utility_rate_at_k_mean": 0.9,
+    "noise_rate_at_k_mean": 0.06,
+    "severe_error_rate_at_k_mean": 0.06,
+    "relation_diversity_at_k_mean": 2.64,
+    "ndcg_at_k_mean": 0.9650842599891452,
+    "mrr_high_utility_mean": 0.99
+  },
+  "train": {
+    "query_count": 31,
+    "pair_count": 930,
+    "useful_rate_at_k_mean": 0.9387096774193548,
+    "high_utility_rate_at_k_mean": 0.9,
+    "noise_rate_at_k_mean": 0.061290322580645165,
+    "severe_error_rate_at_k_mean": 0.061290322580645165,
+    "relation_diversity_at_k_mean": 2.6451612903225805,
+    "ndcg_at_k_mean": 0.9710024802727864,
+    "mrr_high_utility_mean": 1
+  },
+  "validation": {
+    "query_count": 9,
+    "pair_count": 270,
+    "useful_rate_at_k_mean": 0.9444444444444444,
+    "high_utility_rate_at_k_mean": 0.9333333333333333,
+    "noise_rate_at_k_mean": 0.05555555555555555,
+    "severe_error_rate_at_k_mean": 0.05555555555555555,
+    "relation_diversity_at_k_mean": 2.6666666666666665,
+    "ndcg_at_k_mean": 0.9553632871479256,
+    "mrr_high_utility_mean": 0.9444444444444444
+  },
+  "benchmark": {
+    "query_count": 10,
+    "pair_count": 300,
+    "useful_rate_at_k_mean": 0.94,
+    "high_utility_rate_at_k_mean": 0.87,
+    "noise_rate_at_k_mean": 0.06,
+    "severe_error_rate_at_k_mean": 0.06,
+    "relation_diversity_at_k_mean": 2.6,
+    "ndcg_at_k_mean": 0.9554866526669553,
+    "mrr_high_utility_mean": 1
+  }
+}
