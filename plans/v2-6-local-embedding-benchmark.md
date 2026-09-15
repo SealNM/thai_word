@@ -200,3 +200,27 @@ Observed metadata:
 - device: cuda:0
 - normalized embeddings: yes
 - native query/document methods: `encode_query` / `encode_document`
+
+
+## Qwen3 256d persistent rebuild result
+
+Fresh Colab T4 rebuild completed successfully and is stored in the persistent artifact path.
+
+Observed metadata:
+- model: `Qwen/Qwen3-Embedding-0.6B`
+- profile: `qwen3-embedding-0.6b-256`
+- rows: 52,004 dictionary senses
+- dimensions: 256
+- dtype: float32
+- embedding file size: ~50.785 MiB
+- model load: ~34.638s
+- encoding: ~1,326.543s (~22m 07s)
+- batches: 6,501 at batch size 8
+- throughput: ~4.90 batches/s
+- device: cuda:0
+- normalized embeddings: yes
+- max sequence length: 512
+- query instruction: Thai Words lexical-substitution / grammatical-role instruction
+- documents remain unprefixed
+
+Relative to the fresh V2.5 EmbeddingGemma baseline, Qwen3 encoding is about 5.1x slower on the same T4 (1,326.543s vs 259.965s). Quality must therefore improve materially to justify replacing V2.5.
