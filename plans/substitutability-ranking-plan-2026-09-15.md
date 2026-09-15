@@ -771,3 +771,23 @@ See:
 - `evaluation/writer_relevance_50_frozen_checkpoint.md`
 
 The split is frozen before Phase 3 experiments.
+
+
+### Phase 3 baseline checkpoint
+
+A leakage-safe learned baseline is implemented in `scripts/writer_relevance_phase3_baseline.py`.
+
+Rules:
+- fit on train only;
+- evaluate on validation only;
+- benchmark split is not read for model evaluation;
+- features use V2.5 retrieval evidence and query category, never human labels as inputs;
+- ordinal utility is modeled with cumulative binary classifiers;
+- a separate severe-error probability can penalize unsafe/noisy candidates.
+
+Validation-only result:
+- V2.5: Useful@10 **0.9444**, Noise/SevereError **0.0556**, NDCG@10 **0.862307**, MRR **0.9444**
+- ordinal expected utility: Useful@10 **0.9667**, Noise/SevereError **0.0333**, NDCG@10 **0.889110**, MRR **1.000**
+- ordinal minus severe penalty: Useful@10 **0.9667**, Noise/SevereError **0.0333**, NDCG@10 **0.889148**, relation diversity **3.1111**, MRR **1.000**
+
+The frozen benchmark remains untouched. This learned baseline is only a floor for Phase 3 model comparison, not yet a production candidate.
