@@ -731,3 +731,27 @@ Preserve meaning and relevance, favor direct useful alternatives early, but also
 ### Branch history note
 
 After the first Colab checkout, the research branch was squashed/force-updated while refining schema v2. This can make an already-checked-out local branch diverge from origin. During active notebook testing, do not rewrite this branch history again. If a notebook is still on the pre-squash branch, fetch and reset the local branch to origin after preserving any local annotation file.
+
+
+### Phase-2 pre-annotation checkpoint
+
+Phase-2 assistant pre-annotation is now complete, but remains **provisional pending human review**.
+
+Pre-annotation checkpoint:
+- 1,200 / 1,200 Phase-2 pairs labeled under schema v3;
+- 194 pairs flagged for high-priority human review;
+- full CSV and review-only CSV generated separately;
+- severe relations were checked to require utility 0;
+- no model training/model selection is allowed from these labels until review approval.
+
+Provisional top-10 means from the assistant labels:
+- Useful@10 rate: **0.9375**
+- HighUtility@10 rate: **0.9000**
+- Noise@10 rate: **0.0625**
+- SevereError@10 rate: **0.0625**
+- NDCG@10: **0.9678623189**
+- MRR(first utility >= 2): **0.9875**
+
+These values are diagnostic only. They are **not** the frozen human benchmark metrics yet.
+
+Next step: human-review the 194 flagged pairs, apply any corrections, validate the complete 1,200-row file, then freeze the expanded benchmark before model selection.
