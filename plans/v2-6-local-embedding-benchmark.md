@@ -1,6 +1,6 @@
 # V2.6 — Local Multilingual Embedding Benchmark
 
-Status: **Qwen3 256d index built successfully; Arctic build + shared benchmark pending**
+Status: **all three 256d indexes built successfully; shared 10-query benchmark pending**
 
 Branch: `feat/dictionary-semantic-v26-local-embedding-benchmark`
 
@@ -76,7 +76,7 @@ The first benchmark uses the official 256d Matryoshka representation.
 - [x] Add no-model unit tests in `tests/test_dense_v26_local.py`.
 - [x] Run local profile tests.
 - [x] Build Qwen3 256d index.
-- [ ] Build Arctic-L 256d index.
+- [x] Build Arctic-L 256d index.
 - [ ] Run shared 10-query evaluation against V2.5.
 - [ ] Inspect V3 holdout only after the 10-query pilot.
 - [ ] Record build time, model load time, and query latency.
@@ -274,3 +274,31 @@ Why Arctic-L:
 - similar non-embedding compute class (~303M non-embedding parameters), while being operationally much more portable.
 
 The medium profile remains in code only as an experimental/reference profile and is no longer required for the V2.6 decision.
+
+
+## Arctic-L 256d persistent build result
+
+Fresh Colab T4 build completed successfully and is stored in the persistent artifact path.
+
+Observed metadata:
+- model: `Snowflake/snowflake-arctic-embed-l-v2.0`
+- profile: `arctic-embed-l-v2-256`
+- rows: 52,004 dictionary senses
+- dimensions: 256
+- dtype: float32
+- embedding file size: ~50.785 MiB
+- model load: ~40.086s
+- encoding: ~482.202s (~8m 02s)
+- batches: 1,626 at batch size 32
+- throughput: ~3.37 batches/s
+- device: cuda:0
+- normalized embeddings: yes
+- max sequence length: 512
+- native Transformers implementation; no remote-code config overrides
+
+Relative build speed on the same Colab T4:
+- V2.5 EmbeddingGemma: 259.965s
+- Arctic-L: 482.202s (~1.85x slower than V2.5)
+- Qwen3: 1,326.543s (~5.10x slower than V2.5)
+
+Arctic-L is therefore ~2.75x faster to encode than Qwen3 in this setup while producing the same 256d artifact size. Retrieval quality remains the deciding factor.
