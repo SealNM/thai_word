@@ -19,6 +19,8 @@ from scripts.writer_relevance_phase4_holdout import (
 TARGET_FILE = Path("evaluation/writer_relevance_phase4_holdout_targets.json")
 OLD_TARGET_FILE = Path("evaluation/writer_relevance_50_targets.json")
 DECISIONS_FILE = Path("evaluation/writer_relevance_phase4_holdout_sense_decisions.json")
+FROZEN_FILE = Path("evaluation/writer_relevance_phase4_holdout_frozen_queries.json")
+MANIFEST_FILE = Path("evaluation/writer_relevance_phase4_holdout_manifest.json")
 
 
 class Phase4HoldoutTests(unittest.TestCase):
@@ -59,6 +61,24 @@ class Phase4HoldoutTests(unittest.TestCase):
             {item["query"] for item in config["queries"]},
         )
         self.assertTrue(all(isinstance(item["sense"], int) for item in decisions["decisions"]))
+
+    def test_committed_frozen_queries_match_locked_decisions(self) -> None:
+        decisions = json.loads(DECISIONS_FILE.read_text(encoding="utf-8"))
+        frozen = json.loads(FROZEN_FILE.read_text(encoding="utf-8"))
+        manifest = json.loads(MANIFEST_FILE.read_text(encoding="utf-8"))
+
+        expected = {item["query"]: item["sense"] for item in decisions["decisions"]}
+        actual = {item["query"]: item["sense"] for item in frozen["queries"]}
+
+        self.assertEqual(actual, expected)
+        self.assertEqual(frozen["target_count"], TARGET_COUNT)
+        self.assertEqual(frozen["expected_pair_count"], EXPECTED_PAIR_COUNT)
+        self.assertEqual(manifest["target_count"], TARGET_COUNT)
+        self.assertEqual(manifest["expected_pair_count"], EXPECTED_PAIR_COUNT)
+        self.assertFalse(manifest["candidate_exported"])
+        self.assertFalse(manifest["writer_reranker_used_for_target_selection"])
+        self.assertFalse(manifest["writer_reranker_used_for_candidate_export"])
+        self.assertFalse(manifest["quality_selection_performed"])
 
     def test_apply_decisions_rejects_sense_not_in_inspection(self) -> None:
         decisions = json.loads(DECISIONS_FILE.read_text(encoding="utf-8"))

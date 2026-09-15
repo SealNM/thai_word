@@ -1,0 +1,29 @@
+{
+  "status": "phase4_holdout_frozen_before_candidate_export",
+  "schema_version": 3,
+  "target_file": "evaluation/writer_relevance_phase4_holdout_frozen_queries.json",
+  "target_file_sha256": "f6c9fef35a556ecc306d67e42eea605ee85f804f21371595d22d1cca654fcd34",
+  "headword_source_file": "evaluation/writer_relevance_phase4_holdout_targets.json",
+  "headword_source_sha256": "6b2a1ebe8483ab704c49a29da3524f8abcf55505abbae4bbf5ed6e699c3a9855",
+  "sense_inspection": {
+    "status": "complete",
+    "target_count": 20,
+    "unique_sense_count": 8,
+    "reviewed_multi_sense_count": 12,
+    "missing_headword_count": 0,
+    "config_sha256": "6b2a1ebe8483ab704c49a29da3524f8abcf55505abbae4bbf5ed6e699c3a9855",
+    "old_targets_sha256": "b7926fb0df885e253c11f066a5cf705f1de346d748d5fef3d526e3752f343841"
+  },
+  "sense_decisions_file": "evaluation/writer_relevance_phase4_holdout_sense_decisions.json",
+  "sense_decisions_sha256": "e886ddd71a6e2542671a03149ed6eae3b0b764e1102017ebadd42a586a1d297e",
+  "old_targets_file": "evaluation/writer_relevance_50_targets.json",
+  "old_targets_sha256": "b7926fb0df885e253c11f066a5cf705f1de346d748d5fef3d526e3752f343841",
+  "target_count": 20,
+  "candidates_per_query": 30,
+  "expected_pair_count": 600,
+  "headword_overlap_with_original_50": 0,
+  "candidate_exported": false,
+  "writer_reranker_used_for_target_selection": false,
+  "writer_reranker_used_for_candidate_export": false,
+  "quality_selection_performed": false
+}

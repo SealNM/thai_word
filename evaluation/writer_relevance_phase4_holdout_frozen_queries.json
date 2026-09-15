@@ -1,0 +1,171 @@
+{
+  "description": "Phase-4 fresh writer-relevance holdout. Headwords were frozen before candidate/model output; senses were resolved only from the V1 lexical artifact.",
+  "status": "frozen_before_candidate_export",
+  "schema_version": 3,
+  "target_count": 20,
+  "candidates_per_query": 30,
+  "expected_pair_count": 600,
+  "old_target_headword_overlap": 0,
+  "queries": [
+    {
+      "query": "ทะเล",
+      "sense": 1,
+      "definition": "ห้วงนํ้าเค็มที่เวิ้งว้างกว้างใหญ่ แต่เล็กกว่ามหาสมุทร.",
+      "group": "noun_scene",
+      "category": "noun:nature/place",
+      "intended": "ทะเล / แหล่งน้ำเค็มขนาดใหญ่"
+    },
+    {
+      "query": "ภูเขา",
+      "sense": 1,
+      "definition": "พื้นที่ที่มีระดับสูงขึ้นจากบริเวณรอบ ๆ ตั้งแต่ ๖๐๐ เมตรขึ้นไป.",
+      "group": "noun_scene",
+      "category": "noun:nature/place",
+      "intended": "ภูเขา / พื้นดินที่สูงเด่นขึ้นเป็นเขา"
+    },
+    {
+      "query": "แม่น้ำ",
+      "sense": 1,
+      "definition": "ลำนํ้าใหญ่ซึ่งเป็นที่รวมของลำธารทั้งปวง.",
+      "group": "noun_scene",
+      "category": "noun:nature/place",
+      "intended": "แม่น้ำ / ลำน้ำขนาดใหญ่"
+    },
+    {
+      "query": "ดอกไม้",
+      "sense": 2,
+      "definition": "<i>ดูแ ดอก ๑</i>.",
+      "group": "noun_scene",
+      "category": "noun:nature/object",
+      "intended": "ดอกไม้ / ดอกของพืชที่ใช้กล่าวถึงเป็นวัตถุหรือภาพในฉาก"
+    },
+    {
+      "query": "เงา",
+      "sense": 1,
+      "definition": "ส่วนที่มืดเพราะมีวัตถุบังแสงทำให้แลเห็นเป็นรูปของวัตถุนั้น"
+      "group": "noun_scene",
+      "category": "noun:light/scene",
+      "intended": "เงาที่เกิดจากแสงถูกบัง / shadow"
+    },
+    {
+      "query": "กอด",
+      "sense": 1,
+      "definition": "โอบไว้ในวงแขน, โดยปริยายหมายถึงอาการที่มีลักษณะคล้ายคลึงเช่นนั้น.",
+      "group": "verb_action",
+      "category": "verb:action/contact",
+      "intended": "โอบด้วยแขน / embrace"
+    },
+    {
+      "query": "จูบ",
+      "sense": 1,
+      "definition": "เอาจมูกสัมผัสสูดแสดงความรักหรือความใคร่..",
+      "group": "verb_action",
+      "category": "verb:action/contact",
+      "intended": "เช้ริมฝีปากแตะเพื่อแสดงความรักหรือความรู้สึก"
+    },
+    {
+      "query": "ก้ม",
+      "sense": 1,
+      "definition": "ทำให้ตํ่าลงโดยอาการน้อม (ใช้เฉพาะ หัว หน้า และหลัง) เช่น ก้มหัว ก้มหน้า ก้มหลัง.",
+      "group": "verb_action",
+      "category": "verb:posture/action",
+      "intended": "โน้มศีรษะหรือส่วนบนลง"
+    },
+    {
+      "query": "หัน",
+      "sense": 1,
+      "definition": "เปลี่ยนจากทิศทางหนึ่งไปอีกทิศทางหนึ่ง เช่น หันซ้าย หันขวา หันโต๊ะไปทางหน้าต่าง, อยู่ในทิศทางใดทิศทางหนึ่ง เช่น หันหลังให้ประตู, ผัน ก็ว่า",
+      "group": "verb_action",
+      "category": "verb:motion/action",
+      "intended": "เปลี่ยนทิศหรือเบนหน้า/ตัวไปอีกทาง"
+    },
+    {
+      "query": "หลบ",
+      "sense": 1,
+      "definition": "หลีก, เลี่ยงไม่ให้พบ, เลี่ยงไม่ให้ถูก เช่น หลบลูกปืน",
+      "group": "verb_action",
+      "category": "verb:motion/action",
+      "intended": "เบี่ยงหรือเคลื่อนตัวให้พ้น/ซ่อนจากสิ่งหนึ่ง"
+    },
+    {
+      "query": "เงียบ",
+      "sense": 1,
+      "definition": "ไม่มีเสียง เช่น นั่งเงียบ, ไม่มีเสียงอื้ออึง เช่น บ้านนี้เงียบ, สงบ, ปราศจากเสียงรบกวนหรือการก่อกวน, เช่น เหตุการณ์เงียบลงแล้ว",
+      "group": "adjective_state",
+      "category": "adjective:sound/state",
+      "intended": "ไม่มีเสียงหรือสงบเสียง"
+    },
+    {
+      "query": "แห้ง",
+      "sense": 1,
+      "definition": "ไม่มีนํ้า, หมดนํ้า, เช่น คลองแห้ง โอ่งแห้ง, ไม่เปียก เช่น ผ้าแห้ง, ที่ไม่ใส่น้ำ เช่น ก๋วยเตี๋ยวแห้ง บะหมี่แห้ง, ไม่สด เช่น ใบไม้แห้ง",
+      "group": "adjective_state",
+      "category": "adjective:state",
+      "intended": "ไม่มีหรือขาดความเปียกชื้น"
+    },
+    {
+      "query": "หนัก",
+      "sense": 1,
+      "definition": "มีน้ำหนักมาก, ตรงข้ามกับ เบา",
+      "group": "adjective_state",
+      "category": "adjective:weight/state",
+      "intended": "มีน้ำหนักมาก / heavy"
+    },
+    {
+      "query": "เบา",
+      "sense": 1,
+      "definition": "มีน้ำหนักน้อย, ตรงข้ามกับ หนัก",
+      "group": "adjective_state",
+      "category": "adjective:weight/state",
+      "intended": "มีน้ำหนักน้อย / light in weight"
+    },
+    {
+      "query": "หวาน",
+      "sense": 1,
+      "definition": "มีรสอย่างรสนํ้าตาล",
+      "group": "adjective_state",
+      "category": "adjective:taste/quality",
+      "intended": "มีรสหวาน / sweet"
+    },
+    {
+      "query": "คิดถึง",
+      "sense": 1,
+      "definition": "นึกถึง, นึกถึงด้วยใจผูกพัน.",
+      "group": "emotion_abstract",
+      "category": "emotion/mental",
+      "intended": "นึกถึงด้วยความผูกพันหรืออาลัยอยากพบ"
+    },
+    {
+      "query": "หวัง",
+      "sense": 1,
+      "definition": "คาดว่าจะได้, ปองไว้, หมายไว้.",
+      "group": "emotion_abstract",
+      "category": "mental/abstract",
+      "intended": "คาดหมายหรือปรารถนาให้สิ่งหนึ่งเกิดขึ้น"
+    },
+    {
+      "query": "หึง",
+      "sense": 1,
+      "definition": "หวงแหนทางชู้สาว, มักใช้เข้าคู่กับคำ หวง เป็น หึงหวง หรือ หวงหึง.",
+      "group": "emotion_abstract",
+      "category": "emotion",
+      "intended": "รู้สึกหวงเมื่อเกรงว่าคนรักจะสนใจผู้อื่น"
+    },
+    {
+      "query": "สงสัย",
+      "sense": 1,
+      "definition": "ไม่แน่ใจในข้อเท็จจริง เช่น สงสัยว่าทำดีจะได้ดีจริงหรือ, ลังเล เช่น เมื่อเดินไปถึงทาง ๒ แพร่ง สงสัยว่าจะไปทางไหนจึงจะถูก",
+      "group": "emotion_abstract",
+      "category": "mental/abstract",
+      "intended": "ไม่แน่ใจและใคร่รู้ความจริง"
+    },
+    {
+      "query": "กังวล",
+      "sense": 1,
+      "definition": "ห่วงใย, มีใจพะวงอยู่.",
+      "group": "emotion_abstract",
+      "category": "emotion/mental",
+      "intended": "รู้สึกเป็นห่วงหรือกระวนกระวาย"
+    }
+  ]
+}

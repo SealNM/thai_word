@@ -1,7 +1,7 @@
 # Thai Words — Phase 4 Runtime-Compatible Writer Reranker Plan
 
 Date: 2026-09-16  
-Status: **In progress — Waves A-G complete; Wave H senses reviewed and locked, freeze/export pending**  
+Status: **In progress — Waves A-G complete; Wave H targets frozen, V2.5 candidate export pending**  
 Base commit: `959c502254529e7260fdbf98a615b0e4e7858145`  
 Working branch: `feat/phase4-runtime-compatible-reranker-2026-09-16`
 
@@ -1337,3 +1337,61 @@ python -m scripts.writer_relevance_phase4_holdout freeze \
 The freeze step records the decisions-file SHA-256 in the holdout manifest.
 
 Only after freeze succeeds should V2.5 candidate export run.
+
+
+## Wave H freeze complete — 20 target senses immutable
+
+The reviewed sense decisions were applied to the inspected dictionary senses and the fresh holdout target set is now frozen **before candidate export**.
+
+Canonical files:
+
+- `evaluation/writer_relevance_phase4_holdout_targets.json` — headwords frozen before sense inspection;
+- `evaluation/writer_relevance_phase4_holdout_sense_decisions.json` — reviewed query→sense decisions based only on dictionary definitions;
+- `evaluation/writer_relevance_phase4_holdout_frozen_queries.json` — immutable 20 target senses;
+- `evaluation/writer_relevance_phase4_holdout_manifest.json` — freeze hashes and leakage guards.
+
+Frozen target-file SHA-256:
+
+```text
+f6c9fef35a556ecc306d67e42eea605ee85f804f21371595d22d1cca654fcd34
+```
+
+Freeze manifest records:
+
+- target count: **20**
+- candidates per query: **30**
+- expected pair count: **600**
+- original-50 headword overlap: **0**
+- candidate exported: **false**
+- writer reranker used for target selection: **false**
+- writer reranker used for candidate export: **false**
+- quality selection performed: **false**
+
+The raw Kaggle sense-inspection output does not need to be edited manually; the committed sense-decision file and frozen target definitions are now the canonical reviewed decision artifacts. The inspection itself remains reproducible from the frozen headword list + V1 lexical artifact.
+
+### Next gate — export exactly 600 V2.5 pairs
+
+Run:
+
+```bash
+python -m scripts.writer_relevance_phase4_holdout export \
+  --config evaluation/writer_relevance_phase4_holdout_frozen_queries.json \
+  --manifest evaluation/writer_relevance_phase4_holdout_manifest.json \
+  --index artifacts/v1 \
+  --dense-index artifacts/v2/embeddinggemma-300m-256 \
+  --device cuda \
+  --output evaluation/writer_relevance_phase4_holdout_annotations.jsonl \
+  --export-manifest evaluation/writer_relevance_phase4_holdout_export_manifest.json
+```
+
+Expected output:
+
+- **20** query senses;
+- **30** V2.5 candidates per sense;
+- **600** rows total;
+- labels all null;
+- `split=phase4_holdout`;
+- `writer_reranker_used=false`;
+- `holdout_opened_for_model_evaluation=false`.
+
+Do not run learned/neural/hybrid evaluation on the 600 rows before annotation is complete and the labeled holdout is frozen.
