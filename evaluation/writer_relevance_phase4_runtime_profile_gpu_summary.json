@@ -1,0 +1,87 @@
+{
+  "status": "phase4_runtime_profile_gpu_summary",
+  "query": "ฝน",
+  "sense": 1,
+  "top_k": 10,
+  "rerank_pool": 30,
+  "candidate_count": 30,
+  "repeats": 5,
+  "runtime_success": {
+    "reranker_mode": "optional",
+    "reranker_status": "writer_reranked",
+    "reranker_error": null
+  },
+  "timing_seconds": {
+    "startup_excluding_neural_weights": 18.082087,
+    "v25_search": 0.386395,
+    "learned_score": 0.00286,
+    "cold_writer_search": 5.377671,
+    "neural_model_load": 3.774303,
+    "warm_neural_score": {
+      "count": 5,
+      "mean": 1.384402,
+      "median": 1.383754,
+      "min": 1.350166,
+      "max": 1.418807
+    },
+    "warm_writer_search": {
+      "count": 5,
+      "mean": 1.620064,
+      "median": 1.628537,
+      "min": 1.584697,
+      "max": 1.644806
+    }
+  },
+  "memory": {
+    "peak_rss_mb": 4619.375,
+    "cold_cuda": {
+      "available": true,
+      "device_count": 2,
+      "allocated_mb": 3352.776,
+      "reserved_mb": 3452,
+      "max_allocated_mb": 3388.608,
+      "max_reserved_mb": 3452
+    },
+    "warm_cuda": {
+      "available": true,
+      "device_count": 2,
+      "allocated_mb": 3352.776,
+      "reserved_mb": 3452,
+      "max_allocated_mb": 3389.389,
+      "max_reserved_mb": 3452
+    }
+  },
+  "runtime_contract": {
+    "mode": "required",
+    "alpha": 0.5,
+    "default_rerank_pool": 30,
+    "learned_category_mode": "omit",
+    "neural_device": "cuda:0",
+    "neural_max_length": 384,
+    "neural_batch_size": 4,
+    "neural_allow_download": false
+  },
+  "cold_result_words": [
+    "พิรุณ",
+    "พรรษ",
+    "พลาหก",
+    "พรรษ-",
+    "หยาด",
+    "หยาดน้ำฟ้า",
+    "ฝนไล่ช้าง",
+    "ฝนซู่",
+    "ฝนเทียม",
+    "ฝนสั่งฟ้า"
+  ],
+  "quality_selection_performed": false,
+  "phase3_benchmark_used": false,
+  "operational_decision": {
+    "wave_g": "complete",
+    "live_typing": "v2.5_only",
+    "explicit_submitted_search": "writer_reranker_allowed",
+    "hard_dependency": false,
+    "fallback_mode": "optional",
+    "persistent_warm_worker_recommended": true,
+    "model_or_alpha_changed": false
+  }
+}

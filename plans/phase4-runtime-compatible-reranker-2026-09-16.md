@@ -1,7 +1,7 @@
 # Thai Words — Phase 4 Runtime-Compatible Writer Reranker Plan
 
 Date: 2026-09-16  
-Status: **In progress — Waves A-F complete; Wave G profiler implemented and awaiting real measurements**  
+Status: **In progress — Waves A-G complete; Wave H fresh holdout pending**  
 Base commit: `959c502254529e7260fdbf98a615b0e4e7858145`  
 Working branch: `feat/phase4-runtime-compatible-reranker-2026-09-16`
 
@@ -1056,3 +1056,103 @@ Next gate:
 1. run the full `search_writer.py` path with `reranker_mode=optional`;
 2. confirm `reranker_status=writer_reranked` rather than `fallback_v25`;
 3. if successful, run the existing Wave G profiler on the same GPU runtime and archive the resulting runtime report.
+
+
+## Wave G result — GPU runtime gate completed
+
+The full writer-search path completed successfully on Kaggle with:
+
+```text
+reranker_status = writer_reranked
+reranker_error = null
+```
+
+The end-to-end search used:
+
+- V1 lexical artifacts;
+- V2.5 `embeddinggemma-300m-256` dense retrieval;
+- persisted category-free learned writer ranker;
+- saved Phase 3 `BAAI/bge-reranker-v2-m3` checkpoint;
+- fixed alpha **0.5**;
+- top-30 rerank pool;
+- CUDA device `cuda:0`.
+
+The observed query `ฝน#1` returned a writer-reranked top 10 and demonstrated that candidates can move substantially inside the fixed V2.5 pool. This is a runtime integration sanity check only, not a quality-selection benchmark.
+
+### GPU profiler result
+
+Profile:
+
+- query: `ฝน`
+- sense: `1`
+- top-k: **10**
+- rerank pool: **30**
+- repeats: **5**
+- candidate count: **30**
+- startup excluding lazy neural weights: **18.082087 s**
+- V2.5 search: **0.386395 s**
+- learned scorer: **0.002860 s**
+- cold full writer search: **5.377671 s**
+- neural model load component: **3.774303 s**
+- warm neural 30-pair scoring:
+  - mean **1.384402 s**
+  - median **1.383754 s**
+  - min **1.350166 s**
+  - max **1.418807 s**
+- warm full writer search:
+  - mean **1.620064 s**
+  - median **1.628537 s**
+  - min **1.584697 s**
+  - max **1.644806 s**
+- peak process RSS: **4,619.375 MiB**
+- CUDA devices available: **2**
+- cold CUDA allocated: **3,352.776 MiB**
+- cold CUDA reserved: **3,452.0 MiB**
+- cold CUDA max allocated: **3,388.608 MiB**
+- warm CUDA allocated: **3,352.776 MiB**
+- warm CUDA reserved: **3,452.0 MiB**
+- warm CUDA max allocated: **3,389.389 MiB**
+- warm CUDA max reserved: **3,452.0 MiB**
+
+Profiler safeguards confirmed:
+
+```json
+{
+  "quality_selection_performed": false,
+  "phase3_benchmark_used": false
+}
+```
+
+### Runtime interpretation
+
+The learned scorer is effectively negligible relative to neural inference.
+
+The main ongoing cost is the CrossEncoder:
+
+- V2.5 alone: about **0.39 s**
+- warm full writer path: about **1.62 s**
+- incremental warm cost over V2.5: about **1.23 s**
+- neural scoring itself: about **1.38 s**
+
+The warm path is practical for an explicit writer-oriented search request on a persistent GPU worker, but it is too heavy to run automatically on every keystroke/autocomplete event.
+
+Operational decision for the first product integration:
+
+- keep V2.5 for instant/live suggestions;
+- expose writer reranking for explicit submitted searches or behind a feature flag;
+- do not make the heavy reranker a hard availability dependency;
+- keep the `optional` fallback path;
+- keep a persistent/warm worker when neural reranking is enabled;
+- do not change alpha/model/rerank-pool from these runtime measurements.
+
+The CLI may remain `optional` by default for integration testing. A web/live-search endpoint should initially use V2.5 for live typing and invoke writer reranking only after explicit search submission.
+
+A compact machine-readable summary is archived in:
+
+- `evaluation/writer_relevance_phase4_runtime_profile_gpu_summary.json`
+
+Wave G is complete.
+
+Next:
+
+> Wave H — create and freeze a new 20-query / 600-pair holdout before any model, compression, distillation, alpha, feature, or architecture iteration.
