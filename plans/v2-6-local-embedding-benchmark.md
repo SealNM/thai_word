@@ -1,6 +1,6 @@
 # V2.6 — Local Multilingual Embedding Benchmark
 
-Status: **implementation ready; Colab build + benchmark pending**
+Status: **Qwen3 256d index built successfully; Arctic build + shared benchmark pending**
 
 Branch: `feat/dictionary-semantic-v26-local-embedding-benchmark`
 
@@ -75,7 +75,7 @@ The first benchmark uses the official 256d Matryoshka representation.
 - [x] Reuse the existing V2 weighted-RRF evaluator.
 - [x] Add no-model unit tests in `tests/test_dense_v26_local.py`.
 - [ ] Run local profile tests.
-- [ ] Build Qwen3 256d index.
+- [x] Build Qwen3 256d index.
 - [ ] Build Arctic 256d index.
 - [ ] Run shared 10-query evaluation against V2.5.
 - [ ] Inspect V3 holdout only after the 10-query pilot.
@@ -147,3 +147,27 @@ High-value signals:
 - `มืด`: darkness/light adjectives remain ahead of conditions such as blindness.
 
 Do not choose a winner from generic MTEB scores alone. Thai Words' dictionary benchmark and holdout are the decision source.
+
+
+## Qwen3-Embedding-0.6B 256d build result
+
+Real Colab T4 build completed successfully after restarting the runtime, capping sequence length to 512, and using batch size 8.
+
+Observed metadata:
+- rows: 52,004 dictionary senses
+- dimensions: 256
+- dtype: float32
+- embedding file size: ~50.785 MiB
+- model load: ~23.47s
+- encoding: ~1,208.94s (~20m 09s)
+- total batches: 6,501
+- throughput: ~5.38 batches/s at batch size 8
+- device: cuda:0
+- normalized embeddings: yes
+- query instruction: Thai Words-specific lexical substitution / grammatical-role preservation instruction
+- document template: `{headword}: {definition}`
+
+Important operational note:
+- The earlier CUDA OOM was caused by a dirty Colab runtime that still had ~14.3 GiB of T4 VRAM in use from previous model experiments.
+- After restarting the runtime, VRAM returned to 0 MiB / 15,360 MiB and the Qwen3 build completed cleanly.
+- Disk space (~37 GiB free at the time) was not the cause of the failure.
