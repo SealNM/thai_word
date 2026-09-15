@@ -755,3 +755,19 @@ Provisional top-10 means from the assistant labels:
 These values are diagnostic only. They are **not** the frozen human benchmark metrics yet.
 
 Next step: human-review the 194 flagged pairs, apply any corrections, validate the complete 1,200-row file, then freeze the expanded benchmark before model selection.
+
+
+### Frozen 50-target checkpoint
+
+Phase 2 labels were reviewed and approved. The combined benchmark now has 50 target senses / 1,500 pairs.
+
+- train: 31 targets / 930 pairs
+- validation: 9 targets / 270 pairs
+- benchmark: 10 targets / 300 pairs
+
+See:
+- `evaluation/writer_relevance_50_split_manifest.json`
+- `evaluation/writer_relevance_50_metrics_approved.json`
+- `evaluation/writer_relevance_50_frozen_checkpoint.md`
+
+The split is frozen before Phase 3 experiments.
