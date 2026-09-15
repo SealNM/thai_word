@@ -7,7 +7,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from scripts.substitutability_benchmark import export_candidates
+from scripts.substitutability_benchmark import annotate_interactively, export_candidates
 from thai_substitutability import (
     SCHEMA_VERSION,
     benchmark_metrics,
@@ -213,6 +213,40 @@ class SubstitutabilityBenchmarkTests(unittest.TestCase):
                     export_candidates(args)
 
         self.assertEqual(searcher.calls, [])
+
+    def test_annotation_cli_autosaves_and_resumes(self) -> None:
+        row = _row(
+            query_id="ฝน#1",
+            rank=1,
+            utility=0,
+            relation="unrelated",
+        )
+        row["annotation"]["utility"] = None
+        row["annotation"]["relation"] = None
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "annotations.jsonl"
+            path.write_text(
+                json.dumps(row, ensure_ascii=False) + "\n",
+                encoding="utf-8",
+            )
+            args = SimpleNamespace(
+                path=str(path),
+                query="ฝน#1",
+                review=False,
+                limit=None,
+            )
+
+            with patch("builtins.input", side_effect=["2", "4"]):
+                annotate_interactively(args)
+
+            saved = json.loads(path.read_text(encoding="utf-8").strip())
+            self.assertEqual(saved["annotation"]["utility"], 2)
+            self.assertEqual(saved["annotation"]["relation"], "manner_action")
+
+            with patch("builtins.input") as mocked_input:
+                annotate_interactively(args)
+            mocked_input.assert_not_called()
 
     def test_metrics_measure_writer_utility_and_severe_errors(self) -> None:
         rows = [
