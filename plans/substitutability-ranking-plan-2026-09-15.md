@@ -425,6 +425,21 @@ Interpretation:
 
 This query is now a checkpoint, not a tuning target. Do not tune thresholds or model architecture only against ฝน#1.
 
+
+### Frozen checkpoint: โกรธ#1 — schema v3 baseline
+
+V2.5 top-10 after human annotation:
+
+- Useful@10: **10/10 (1.00)**
+- HighUtility@10: **10/10 (1.00)**
+- Noise@10: **0/10 (0.00)**
+- SevereError@10: **0/10 (0.00)**
+- relation diversity: **2**
+- NDCG@10: **0.9603250160**
+- MRR(first utility >= 2): **1.0**
+
+Compared with `ฝน#1`, this query is almost ideal. This supports the hypothesis that ranking difficulty varies by concept and lexical-neighborhood structure rather than V2.5 retrieval failing uniformly. Continue the remaining pilot queries before selecting reranker thresholds or objectives.
+
 ## Phase 2 — Human-rated writer-relevance dataset
 
 After the revised annotation schema is ready:
