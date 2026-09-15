@@ -1,6 +1,6 @@
 # PyThaiNLP word-vector benchmark
 
-Status: ready for pilot. Branches from V2.5 and does not alter the V2.5 baseline.
+Status: rejected after thai2fit_wv pilot. V2.5 remains the baseline; LTW2V follow-up is not justified.
 
 ## Question
 
@@ -62,3 +62,37 @@ If thai2fit is promising, rerun with one of:
 ## Decision
 
 This is a challenger benchmark only. V2.5 remains the validated baseline unless a PyThaiNLP vector mode shows clearly better lexical substitution behavior across the shared queries.
+
+
+## Pilot result — thai2fit_wv rejected
+
+Observed coverage:
+- headword coverage: 40.0%
+- sense-definition mean coverage: 100.0%
+- vector size: 300d
+
+The headword mode produced some useful neighbors, for example:
+- โกรธ → โมโห
+- สวย → งดงาม
+- พูด → พูดจา / กล่าว
+- บ้าน → หมู่บ้าน / บ้านพัก
+- เร็ว → รวดเร็ว
+- กลัว → เกรง / หวาดกลัว / เกรงกลัว
+
+However, the dominant behavior is distributional association rather than lexical substitution:
+- ฝน → พายุ / หิมะ / อุทกภัย / มรสุม
+- เดิน → เดินทาง / วิ่ง / แล่น / ปีน
+- มืด → สว่าง / สดใส
+- เร็ว → ช้า / ล่าช้า
+- กลัว → เกลียด / โกรธ
+
+This is a fundamental mismatch for Thai Words: antonyms, co-occurring concepts, related actions, and topic-neighbors can be close in static Word2Vec space even when they cannot replace the query in a sentence.
+
+The sense-definition mean mode is substantially worse. Although nominal coverage reaches 100%, averaging static vectors over dictionary-definition tokens collapses meaning toward generic definition/context vocabulary and returns largely unrelated entries. Coverage therefore must not be interpreted as semantic quality.
+
+### Decision
+
+- Do not integrate thai2fit_wv into V2.5.
+- Do not tune the mean-vector method on the current 10-query set.
+- Do not continue to LTW2V in this experiment: a larger static Word2Vec vocabulary may improve OOV coverage but does not address the core association-vs-substitution failure demonstrated by thai2fit_wv.
+- Keep V2.5 EmbeddingGemma + lexical PyThaiNLP hybrid as the strongest validated baseline.
