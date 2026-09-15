@@ -10,7 +10,7 @@ from typing import Any
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from thai_hybrid_v2 import HybridSearcher
-from thai_lexical_v1 import load_artifacts
+from thai_lexical_v1 import list_senses, load_artifacts
 from thai_substitutability import (
     SCHEMA_VERSION,
     SEMANTIC_RELATIONS,
@@ -61,6 +61,76 @@ def _load_config(path: str | Path) -> dict[str, Any]:
     if not isinstance(data, dict) or not isinstance(data.get("queries"), list):
         raise ValueError("Config must contain a 'queries' array.")
     return data
+
+
+def inspect_targets(args: argparse.Namespace) -> None:
+    config = _load_config(args.config)
+    lexical = load_artifacts(args.index)
+
+    report_rows: list[dict[str, Any]] = []
+    missing = 0
+    unresolved = 0
+    resolved = 0
+
+    for spec in config["queries"]:
+        query = str(spec["query"]).strip()
+        requested_sense = spec.get("sense")
+        senses = list_senses(lexical, query)
+
+        row = {
+            "query": query,
+            "category": spec.get("category"),
+            "intended": spec.get("intended"),
+            "requested_sense": requested_sense,
+            "status": None,
+            "recommended_sense": None,
+            "senses": senses,
+        }
+
+        if not senses:
+            row["status"] = "missing_headword"
+            missing += 1
+        elif requested_sense is not None:
+            requested_sense = int(requested_sense)
+            if any(int(item["sense"]) == requested_sense for item in senses):
+                row["status"] = "explicit"
+                row["recommended_sense"] = requested_sense
+                resolved += 1
+            else:
+                row["status"] = "invalid_explicit_sense"
+                unresolved += 1
+        elif len(senses) == 1:
+            row["status"] = "unique"
+            row["recommended_sense"] = int(senses[0]["sense"])
+            resolved += 1
+        else:
+            row["status"] = "needs_review"
+            unresolved += 1
+
+        report_rows.append(row)
+
+    report = {
+        "config": str(args.config),
+        "target_count": len(report_rows),
+        "resolved_count": resolved,
+        "unresolved_count": unresolved,
+        "missing_count": missing,
+        "targets": report_rows,
+    }
+
+    rendered = json.dumps(report, ensure_ascii=False, indent=2)
+    print(rendered)
+
+    if args.output:
+        out = Path(args.output)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(rendered + "\n", encoding="utf-8")
+
+    print(
+        f"Target inspection: {resolved} resolved, {unresolved} need review, "
+        f"{missing} missing headword(s).",
+        file=sys.stderr,
+    )
 
 
 def export_candidates(args: argparse.Namespace) -> None:
@@ -599,6 +669,21 @@ def build_parser() -> argparse.ArgumentParser:
         description="Thai Words writer lexical-relevance benchmark utilities."
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
+
+    inspect = subparsers.add_parser(
+        "inspect-targets",
+        help="Inspect dictionary senses before freezing benchmark target senses.",
+    )
+    inspect.add_argument(
+        "--config",
+        default="evaluation/writer_relevance_phase2_targets.json",
+    )
+    inspect.add_argument("--index", default="artifacts/v1")
+    inspect.add_argument(
+        "--output",
+        default="evaluation/writer_relevance_phase2_sense_report.json",
+    )
+    inspect.set_defaults(func=inspect_targets)
 
     export = subparsers.add_parser(
         "export",
