@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from thai_hybrid_v2 import HybridSearcher
 from thai_lexical_v1 import load_artifacts
 from thai_substitutability import (
+    RELATIONS,
     SCHEMA_VERSION,
     benchmark_metrics,
     read_jsonl,
@@ -137,6 +138,207 @@ def export_candidates(args: argparse.Namespace) -> None:
     )
 
 
+
+ANNOTATION_RELATIONS = (
+    "direct",
+    "near_register",
+    "subtype",
+    "manner_action",
+    "scene_context",
+    "effect_state",
+    "literary_imagery",
+    "weak_related",
+    "opposite_misleading",
+    "sense_mismatch",
+    "unrelated",
+    "unclear",
+)
+
+if set(ANNOTATION_RELATIONS) != set(RELATIONS):
+    raise RuntimeError("Annotation relation menu is out of sync with schema relations.")
+
+
+def _is_labeled(row: dict[str, Any]) -> bool:
+    annotation = row.get("annotation")
+    return (
+        isinstance(annotation, dict)
+        and annotation.get("utility") in {0, 1, 2, 3}
+        and annotation.get("relation") in RELATIONS
+    )
+
+
+def _matches_query(row: dict[str, Any], query_filter: str | None) -> bool:
+    if not query_filter:
+        return True
+    query_filter = query_filter.strip()
+    query = row.get("query") or {}
+    return query_filter in {
+        str(row.get("query_id", "")),
+        str(query.get("word", "")),
+    }
+
+
+def _show_annotation_row(
+    row: dict[str, Any],
+    *,
+    position: int,
+    total: int,
+    labeled_count: int,
+) -> None:
+    query = row["query"]
+    candidate = row["candidate"]
+    retrieval = row["retrieval"]
+    print()
+    print("=" * 72)
+    print(
+        f"[{position}/{total}] labeled={labeled_count} | "
+        f"{row['query_id']} | V2.5 #{retrieval['v25_rank']}"
+    )
+    print(f"QUERY     : {query['word']} — {query.get('definition') or '-'}")
+    print(
+        f"CANDIDATE : {candidate['word']} — "
+        f"{candidate.get('definition') or '-'}"
+    )
+    hint = retrieval.get("relation_hint")
+    if hint:
+        print(f"V2.5 hint : {hint}")
+    print()
+
+
+def _prompt_utility() -> int | str:
+    while True:
+        raw = input(
+            "Writer utility [3=สูงมาก, 2=ชัดเจน, 1=พอมีประโยชน์, "
+            "0=ไม่ช่วย] (s=ข้าม, q=ออก): "
+        ).strip().lower()
+        if raw in {"s", "q"}:
+            return raw
+        if raw in {"0", "1", "2", "3"}:
+            return int(raw)
+        print("กรุณาเลือก 0, 1, 2, 3, s หรือ q")
+
+
+def _prompt_relation(utility: int) -> str | None:
+    severe = {"opposite_misleading", "sense_mismatch", "unrelated"}
+    print("Relation:")
+    for index, relation in enumerate(ANNOTATION_RELATIONS, start=1):
+        print(f"  {index:>2}. {relation}")
+
+    while True:
+        raw = input("เลือก relation (เลข, b=ย้อนกลับ utility): ").strip().lower()
+        if raw == "b":
+            return None
+        if not raw.isdigit():
+            print("กรุณาเลือกหมายเลข relation หรือ b")
+            continue
+        index = int(raw)
+        if not 1 <= index <= len(ANNOTATION_RELATIONS):
+            print("หมายเลข relation อยู่นอกช่วง")
+            continue
+        relation = ANNOTATION_RELATIONS[index - 1]
+        if utility > 0 and relation in severe:
+            print(
+                f"{relation} เป็น severe error และ schema กำหนดให้ utility ต้องเป็น 0"
+            )
+            continue
+        return relation
+
+
+def annotate_interactively(args: argparse.Namespace) -> None:
+    rows = read_jsonl(args.path)
+    errors = validate_rows(rows, require_labels=False)
+    if errors:
+        for error in errors:
+            print(f"ERROR: {error}", file=sys.stderr)
+        raise SystemExit(1)
+
+    eligible = [
+        index
+        for index, row in enumerate(rows)
+        if _matches_query(row, args.query)
+        and (args.review or not _is_labeled(row))
+    ]
+
+    if args.limit is not None:
+        if args.limit < 1:
+            raise ValueError("--limit must be at least 1.")
+        eligible = eligible[: args.limit]
+
+    if not eligible:
+        print("No matching unlabeled rows. Nothing to annotate.")
+        return
+
+    total_matching = sum(
+        1 for row in rows if _matches_query(row, args.query)
+    )
+    labeled_matching = sum(
+        1
+        for row in rows
+        if _matches_query(row, args.query) and _is_labeled(row)
+    )
+
+    print(
+        f"Writer Relevance annotation: {len(eligible)} row(s) queued; "
+        f"{labeled_matching}/{total_matching} matching rows already labeled."
+    )
+    print("Autosave: every completed label is written immediately.")
+
+    completed_this_run = 0
+    cursor = 0
+    while cursor < len(eligible):
+        row_index = eligible[cursor]
+        row = rows[row_index]
+        _show_annotation_row(
+            row,
+            position=cursor + 1,
+            total=len(eligible),
+            labeled_count=labeled_matching + completed_this_run,
+        )
+
+        utility_or_command = _prompt_utility()
+        if utility_or_command == "q":
+            break
+        if utility_or_command == "s":
+            cursor += 1
+            continue
+
+        utility = int(utility_or_command)
+        relation = _prompt_relation(utility)
+        if relation is None:
+            continue
+
+        previous_labeled = _is_labeled(row)
+        row["annotation"]["utility"] = utility
+        row["annotation"]["relation"] = relation
+
+        row_errors = validate_rows([row], require_labels=True)
+        if row_errors:
+            for error in row_errors:
+                print(f"ERROR: {error}", file=sys.stderr)
+            row["annotation"]["utility"] = None
+            row["annotation"]["relation"] = None
+            continue
+
+        write_jsonl(args.path, rows)
+        if not previous_labeled:
+            completed_this_run += 1
+        print(
+            f"Saved: {row['query']['word']} -> {row['candidate']['word']} "
+            f"| utility={utility} | relation={relation}"
+        )
+        cursor += 1
+
+    remaining = sum(
+        1
+        for row in rows
+        if _matches_query(row, args.query) and not _is_labeled(row)
+    )
+    print(
+        f"Session complete: labeled {completed_this_run} new row(s); "
+        f"{remaining} matching row(s) remain unlabeled."
+    )
+
+
 def validate_annotations(args: argparse.Namespace) -> None:
     rows = read_jsonl(args.path)
     errors = validate_rows(rows, require_labels=not args.allow_unlabeled)
@@ -196,6 +398,34 @@ def build_parser() -> argparse.ArgumentParser:
         default="evaluation/substitutability_annotations.jsonl",
     )
     export.set_defaults(func=export_candidates)
+
+
+    annotate = subparsers.add_parser(
+        "annotate",
+        help="Interactively label writer utility and relation with autosave/resume.",
+    )
+    annotate.add_argument(
+        "path",
+        nargs="?",
+        default="evaluation/substitutability_annotations.jsonl",
+    )
+    annotate.add_argument(
+        "--query",
+        default=None,
+        help="Only annotate one query headword or exact query_id, e.g. ฝน or ฝน#1.",
+    )
+    annotate.add_argument(
+        "--review",
+        action="store_true",
+        help="Include already-labeled rows so their labels can be reviewed/replaced.",
+    )
+    annotate.add_argument(
+        "--limit",
+        type=int,
+        default=None,
+        help="Annotate at most this many queued rows in the session.",
+    )
+    annotate.set_defaults(func=annotate_interactively)
 
     validate = subparsers.add_parser(
         "validate",
