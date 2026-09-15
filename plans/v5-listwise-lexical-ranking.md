@@ -1,6 +1,6 @@
 # V5 — Listwise Lexical Ranking
 
-Status: **V5.3 Gemma 4 pilot complete; Gemma-direct is strongest quality direction, V5.3.1 hard lexical gate + smaller pool rerun pending**
+Status: **research archived; later distillation/reranking experiments did not beat V2.5 overall**
 
 Branch: `feat/dictionary-semantic-v5-listwise-ranker`
 
@@ -673,3 +673,24 @@ python -u scripts/evaluate_v53.py \
   --mode direct \
   --output artifacts/v5/gemma4-e2b-direct30-hardgate.json
 ```
+
+
+## Final project-level checkpoint after V5
+
+Gemma 4 direct remained the strongest *quality-oriented* judge tested in this line of research, especially for common-first ordering, but it was too slow for normal interactive search and still leaked lexical-role/association errors.
+
+The project subsequently tested:
+- V2.6 bounded TNC rarity reranking;
+- V2.7 Gemma-distilled linear pairwise ranking;
+- PyThaiNLP static word vectors.
+
+None produced a consistent holdout win over V2.5. V2.7 in particular introduced large regressions such as ฝน→เมฆ, รัก→จอด, พูด→พจน์/ปาก, and กลัว→กระดก.
+
+Therefore:
+- do not continue V5.3.1 tuning on the existing 10-query benchmark;
+- keep Gemma 4 as a useful offline teacher/research reference only;
+- keep V2.5 as the validated runtime baseline;
+- require a larger frozen human-reviewed benchmark before another ranking-model round.
+
+Canonical handoff:
+`plans/semantic-search-research-summary-2026-09-15.md` on `feat/dictionary-semantic-v2-5-embeddinggemma`.
