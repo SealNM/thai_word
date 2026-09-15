@@ -333,6 +333,16 @@ Decision: **schema v2 is superseded by schema v3 before annotating the remaining
 
 ### Writer Relevance schema v3
 
+Implementation status:
+- [x] schema v3 constants and validator;
+- [x] independent semantic relation axis;
+- [x] multi-label style/register tags;
+- [x] v2 -> v3 migration preserving writer utility;
+- [x] resumable annotation CLI that skips re-entering preserved utility;
+- [x] per-query metrics for partially annotated pilot files;
+- [x] 12 focused unit tests written for schema/migration/annotation/metrics;
+- [ ] final unit-test execution on Colab/Kaggle after pulling the latest branch.
+
 Schema v3 fields:
 
 ```json
