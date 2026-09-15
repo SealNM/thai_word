@@ -237,3 +237,21 @@ config_kwargs={"use_memory_efficient_attention": False}
 ```
 
 to Sentence Transformers. This uses the model's standard attention path and avoids an unnecessary optional dependency on Colab. The semantic model weights, 256d Matryoshka truncation, query prefix, and document formatting are unchanged.
+
+
+### Arctic second Colab failure: unpadding path
+
+After disabling optional xFormers memory-efficient attention, the first encode batch still failed with a CUDA device-side gather assertion. The published Arctic config keeps `unpad_inputs=true`; its remote GTE implementation then enters a pad/unpad path even when memory-efficient attention is disabled.
+
+For the Colab/local benchmark profile, disable both optimized flags together:
+
+```python
+config_kwargs={
+    "use_memory_efficient_attention": False,
+    "unpad_inputs": False,
+}
+```
+
+This keeps standard padded attention end-to-end and avoids the incompatible gather/pad path. Model weights, query/document formatting, and 256d Matryoshka truncation remain unchanged.
+
+Operational note: a CUDA device-side assertion poisons the active CUDA context. Restart the Colab session/runtime before retrying after this error.
