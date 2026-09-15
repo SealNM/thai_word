@@ -1,7 +1,7 @@
 # Thai Words — Writer Lexical Relevance & Utility Ranking Plan
 
 Date: 2026-09-15  
-Status: **In progress — 10-query schema v3 pilot approved; Phase 2 target expansion active**  
+Status: **In progress — Phase 3 validation-only model and hybrid experiments active**  
 Baseline: `feat/dictionary-semantic-v2-5-embeddinggemma`  
 Working branch: `feat/dictionary-substitutability-benchmark`
 
@@ -829,3 +829,97 @@ Focused tests cover:
 - benchmark rows never reach training or prediction.
 
 The frozen benchmark must remain untouched until a candidate is selected from train/validation evidence.
+
+### Phase 3 MMARCO result and hybrid checkpoint
+
+The first trained cross-encoder comparison has been completed on the frozen validation split and archived as:
+
+- `evaluation/writer_relevance_phase3_mmarco_cpu_validation_report.json`
+- model: `cross-encoder/mmarco-mMiniLMv2-L12-H384-v1`
+- train: 31 target senses / 930 pairs
+- validation: 9 target senses / 270 pairs
+- benchmark: not evaluated and not used for training
+
+Validation result:
+
+- V2.5 NDCG@10: **0.862307**
+- learned baseline NDCG@10: **0.889148**
+- MMARCO cross-encoder NDCG@10: **0.854554**
+- MMARCO Useful@10: **0.9667**
+- MMARCO HighUtility@10: **0.9444**
+- MMARCO Noise/SevereError: **0.0333**
+- MMARCO relation diversity: **2.6667**
+- MMARCO MRR: **0.9444**
+
+Interpretation:
+
+- the neural reranker matched the learned baseline on Useful@10 and Noise/SevereError;
+- it improved HighUtility@10 slightly;
+- it regressed materially on NDCG, relation diversity, and MRR;
+- therefore it is not promoted as a standalone candidate;
+- the result still suggests neural relevance evidence may be useful as one bounded ranking signal rather than replacing the learned baseline.
+
+The frozen benchmark remains untouched.
+
+### Phase 3 hybrid harness
+
+A validation-only hybrid experiment is implemented in `scripts/writer_relevance_phase3_hybrid.py`.
+
+Design:
+
+- keep the leakage-safe learned baseline as the primary signal;
+- consume a validation-only neural score artifact keyed by frozen `pair_id`;
+- reject score artifacts containing non-validation/unknown pairs or missing validation pairs;
+- normalize learned and neural scores independently within each query by average rank;
+- blend with `hybrid = (1 - alpha) * learned + alpha * neural`;
+- default alpha grid: `0,0.1,0.2,0.3,0.4,0.5`;
+- select the validation alpha with the highest NDCG only among candidates that do not worsen learned-baseline Noise@10 or SevereError@10;
+- report whether the selected alpha is an actual improvement over alpha=0;
+- benchmark rows are never used for hybrid fitting, scoring, alpha selection, or metrics.
+
+The cross-encoder harness now also supports `--score-output`, `--no-finetune`, `--device`, `--trust-remote-code`, and `--use-amp`.
+
+### Next Kaggle experiment
+
+Colab GPU quota was unavailable for this round, so the next GPU experiment should run on Kaggle.
+
+The next research candidate is `BAAI/bge-reranker-v2-m3`:
+
+- multilingual reranker;
+- Apache-2.0 model license;
+- run pretrained/no-finetune first before spending GPU time on fine-tuning.
+
+Validation-only scoring:
+
+```bash
+python -m scripts.writer_relevance_phase3_crossencoder \
+  --input evaluation/writer_relevance_50_annotations.approved.jsonl \
+  --model BAAI/bge-reranker-v2-m3 \
+  --no-finetune \
+  --device cuda \
+  --eval-batch-size 8 \
+  --max-length 384 \
+  --score-output evaluation/writer_relevance_phase3_bge_v2_m3_validation_scores.jsonl \
+  --include-per-query \
+  --output evaluation/writer_relevance_phase3_bge_v2_m3_validation_report.json
+```
+
+Hybrid grid:
+
+```bash
+python -m scripts.writer_relevance_phase3_hybrid \
+  --input evaluation/writer_relevance_50_annotations.approved.jsonl \
+  --neural-scores evaluation/writer_relevance_phase3_bge_v2_m3_validation_scores.jsonl \
+  --alphas 0,0.1,0.2,0.3,0.4,0.5 \
+  --include-per-query \
+  --output evaluation/writer_relevance_phase3_bge_v2_m3_hybrid_report.json
+```
+
+Decision rule before fine-tuning:
+
+1. compare neural-only BGE against the learned baseline;
+2. inspect the full hybrid alpha grid;
+3. require no Noise/SevereError regression for the selected alpha;
+4. require a real validation NDCG improvement over alpha=0 before treating the neural signal as additive;
+5. if no hybrid alpha improves the learned baseline, do not fine-tune this model merely to chase the nine validation queries;
+6. keep the frozen benchmark closed until a candidate architecture is selected from train/validation evidence.

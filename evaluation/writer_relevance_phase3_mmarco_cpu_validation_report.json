@@ -1,0 +1,76 @@
+{
+  "status": "validation_only_phase3_crossencoder",
+  "input": "evaluation/writer_relevance_50_annotations.approved.jsonl",
+  "model": "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1",
+  "objective": "writer_utility_soft_binary_regression_0_to_1",
+  "train_pair_count": 930,
+  "validation_pair_count": 270,
+  "train_query_count": 31,
+  "validation_query_count": 9,
+  "epochs": 2,
+  "batch_size": 16,
+  "eval_batch_size": 32,
+  "learning_rate": 2e-05,
+  "warmup_ratio": 0.1,
+  "warmup_steps": 12,
+  "max_length": 384,
+  "seed": 42,
+  "baseline_v25": {
+    "useful_rate_at_k_mean": 0.9444444444444444,
+    "high_utility_rate_at_k_mean": 0.9333333333333333,
+    "noise_rate_at_k_mean": 0.05555555555555555,
+    "severe_error_rate_at_k_mean": 0.05555555555555555,
+    "relation_diversity_at_k_mean": 2.6666666666666665,
+    "ndcg_at_k_mean": 0.8623068038563164,
+    "mrr_high_utility_mean": 0.9444444444444444
+  },
+  "cross_encoder_utility": {
+    "useful_rate_at_k_mean": 0.9666666666666666,
+    "high_utility_rate_at_k_mean": 0.9444444444444444,
+    "noise_rate_at_k_mean": 0.03333333333333334,
+    "severe_error_rate_at_k_mean": 0.03333333333333334,
+    "relation_diversity_at_k_mean": 2.6666666666666665,
+    "ndcg_at_k_mean": 0.8545542634644048,
+    "mrr_high_utility_mean": 0.9444444444444444
+  },
+  "delta_vs_v25": {
+    "useful_rate_at_k_mean": 0.022222222222222143,
+    "high_utility_rate_at_k_mean": 0.011111111111111072,
+    "noise_rate_at_k_mean": -0.022222222222222213,
+    "severe_error_rate_at_k_mean": -0.022222222222222213,
+    "relation_diversity_at_k_mean": 0.0,
+    "ndcg_at_k_mean": -0.007752540391911644,
+    "mrr_high_utility_mean": 0.0
+  },
+  "benchmark_split_evaluated": false,
+  "benchmark_pairs_used_for_training": 0,
+  "learned_floor": {
+    "useful_rate_at_k_mean": 0.9666666666666666,
+    "high_utility_rate_at_k_mean": 0.9333333333333333,
+    "noise_rate_at_k_mean": 0.03333333333333334,
+    "severe_error_rate_at_k_mean": 0.03333333333333334,
+    "relation_diversity_at_k_mean": 3.111111111111111,
+    "ndcg_at_k_mean": 0.8891483362282026,
+    "mrr_high_utility_mean": 1
+  },
+  "delta_vs_learned_floor": {
+    "useful_rate_at_k_mean": 0.0,
+    "high_utility_rate_at_k_mean": 0.011111111111111072,
+    "noise_rate_at_k_mean": 0.0,
+    "severe_error_rate_at_k_mean": 0.0,
+    "relation_diversity_at_k_mean": -0.44444444444444464,
+    "ndcg_at_k_mean": -0.03459407276379778,
+    "mrr_high_utility_mean": -0.05555555555555558
+  },
+  "cross_encoder_validation_queries": {
+    "ถนน#1": {"candidate_count": 30, "visible_count": 10, "noise_at_k": 0, "noise_rate_at_k": 0.0, "useful_at_k": 10, "useful_rate_at_k": 1.0, "high_utility_at_k": 9, "high_utility_rate_at_k": 0.9, "severe_error_at_k": 0, "severe_error_rate_at_k": 0.0, "relation_diversity_at_k": 3, "ndcg_at_k": 0.8945574555295974, "mrr_high_utility": 1.0},
+    "นุ่ม#1": {"candidate_count": 30, "visible_count": 10, "noise_at_k": 0, "noise_rate_at_k": 0.0, "useful_at_k": 10, "useful_rate_at_k": 1.0, "high_utility_at_k": 10, "high_utility_rate_at_k": 1.0, "severe_error_at_k": 0, "severe_error_rate_at_k": 0.0, "relation_diversity_at_k": 2, "ndcg_at_k": 0.9224654597764764, "mrr_high_utility": 1.0},
+    "ประตู#1": {"candidate_count": 30, "visible_count": 10, "noise_at_k": 1, "noise_rate_at_k": 0.1, "useful_at_k": 9, "useful_rate_at_k": 0.9, "high_utility_at_k": 9, "high_utility_rate_at_k": 0.9, "severe_error_at_k": 1, "severe_error_rate_at_k": 0.1, "relation_diversity_at_k": 3, "ndcg_at_k": 0.7408852136469247, "mrr_high_utility": 1.0},
+    "ป่า#1": {"candidate_count": 30, "visible_count": 10, "noise_at_k": 0, "noise_rate_at_k": 0.0, "useful_at_k": 10, "useful_rate_at_k": 1.0, "high_utility_at_k": 10, "high_utility_rate_at_k": 1.0, "severe_error_at_k": 0, "severe_error_rate_at_k": 0.0, "relation_diversity_at_k": 1, "ndcg_at_k": 0.9206500320722545, "mrr_high_utility": 1.0},
+    "หอม#5": {"candidate_count": 30, "visible_count": 10, "noise_at_k": 2, "noise_rate_at_k": 0.2, "useful_at_k": 8, "useful_rate_at_k": 0.8, "high_utility_at_k": 8, "high_utility_rate_at_k": 0.8, "severe_error_at_k": 2, "severe_error_rate_at_k": 0.2, "relation_diversity_at_k": 4, "ndcg_at_k": 0.659802819912608, "mrr_high_utility": 0.5},
+    "ห้อง#1": {"candidate_count": 30, "visible_count": 10, "noise_at_k": 0, "noise_rate_at_k": 0.0, "useful_at_k": 10, "useful_rate_at_k": 1.0, "high_utility_at_k": 10, "high_utility_rate_at_k": 1.0, "severe_error_at_k": 0, "severe_error_rate_at_k": 0.0, "relation_diversity_at_k": 5, "ndcg_at_k": 0.6071594944123122, "mrr_high_utility": 1.0},
+    "เปียก#1": {"candidate_count": 30, "visible_count": 10, "noise_at_k": 0, "noise_rate_at_k": 0.0, "useful_at_k": 10, "useful_rate_at_k": 1.0, "high_utility_at_k": 9, "high_utility_rate_at_k": 0.9, "severe_error_at_k": 0, "severe_error_rate_at_k": 0.0, "relation_diversity_at_k": 2, "ndcg_at_k": 0.94546789582947, "mrr_high_utility": 1.0},
+    "เมือง#4": {"candidate_count": 30, "visible_count": 10, "noise_at_k": 0, "noise_rate_at_k": 0.0, "useful_at_k": 10, "useful_rate_at_k": 1.0, "high_utility_at_k": 10, "high_utility_rate_at_k": 1.0, "severe_error_at_k": 0, "severe_error_rate_at_k": 0.0, "relation_diversity_at_k": 2, "ndcg_at_k": 1.0, "mrr_high_utility": 1.0},
+    "แข็ง#2": {"candidate_count": 30, "visible_count": 10, "noise_at_k": 0, "noise_rate_at_k": 0.0, "useful_at_k": 10, "useful_rate_at_k": 1.0, "high_utility_at_k": 10, "high_utility_rate_at_k": 1.0, "severe_error_at_k": 0, "severe_error_rate_at_k": 0.0, "relation_diversity_at_k": 2, "ndcg_at_k": 1.0, "mrr_high_utility": 1.0}
+  }
+}

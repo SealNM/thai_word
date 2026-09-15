@@ -71,15 +71,23 @@ def utility_target(row: dict[str, Any]) -> float:
     return utility / 3.0
 
 
-def _fit_model(train: list[dict[str, Any]], args: argparse.Namespace) -> tuple[Any, int]:
-    from sentence_transformers import CrossEncoder, InputExample
-    from torch.utils.data import DataLoader
+def _load_model(args: argparse.Namespace) -> Any:
+    from sentence_transformers import CrossEncoder
 
-    model = CrossEncoder(
+    return CrossEncoder(
         args.model,
         num_labels=1,
         max_length=args.max_length,
+        trust_remote_code=bool(getattr(args, "trust_remote_code", False)),
+        device=getattr(args, "device", None),
     )
+
+
+def _fit_model(train: list[dict[str, Any]], args: argparse.Namespace) -> tuple[Any, int]:
+    from sentence_transformers import InputExample
+    from torch.utils.data import DataLoader
+
+    model = _load_model(args)
     examples = [
         InputExample(texts=list(text_pair(row)), label=utility_target(row))
         for row in train
@@ -109,6 +117,7 @@ def _fit_model(train: list[dict[str, Any]], args: argparse.Namespace) -> tuple[A
         optimizer_params={"lr": args.learning_rate},
         output_path=str(args.model_output) if args.model_output else None,
         save_best_model=False,
+        use_amp=bool(getattr(args, "use_amp", False)),
         show_progress_bar=not args.no_progress,
     )
     return model, warmup_steps
@@ -153,6 +162,30 @@ def _load_learned_floor(path: str | None) -> dict[str, Any] | None:
     return floor
 
 
+def _write_score_output(
+    path: str | Path,
+    rows: list[dict[str, Any]],
+    scores: np.ndarray,
+    *,
+    model: str,
+) -> None:
+    if len(rows) != len(scores):
+        raise ValueError("rows and scores must have the same length.")
+    output = Path(path)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with output.open("w", encoding="utf-8") as handle:
+        for row, score in zip(rows, scores):
+            payload = {
+                "schema_version": 1,
+                "pair_id": row["pair_id"],
+                "query_id": row["query_id"],
+                "split": "validation",
+                "score": float(score),
+                "model": model,
+            }
+            handle.write(json.dumps(payload, ensure_ascii=False) + "\n")
+
+
 def run(args: argparse.Namespace) -> dict[str, Any]:
     rows = read_jsonl(args.input)
     _validate_split_integrity(rows)
@@ -160,10 +193,22 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     train = [row for row in rows if row.get("split") == "train"]
     validation = [row for row in rows if row.get("split") == "validation"]
 
+    no_finetune = bool(getattr(args, "no_finetune", False))
+    if no_finetune:
+        model = _load_model(args)
+        warmup_steps = 0
+        model_fit_pair_count = 0
+    else:
+        model, warmup_steps = _fit_model(train, args)
+        model_fit_pair_count = len(train)
+
     # Benchmark rows remain present only for split-integrity validation. Their labels/text
     # are never supplied to the model or to validation metrics in this experiment.
-    model, warmup_steps = _fit_model(train, args)
     scores = _predict(model, validation, args)
+
+    score_output = getattr(args, "score_output", None)
+    if score_output:
+        _write_score_output(score_output, validation, scores, model=args.model)
 
     baseline_report = benchmark_metrics(validation, k=args.k)
     reranked = _rerank_for_metrics(validation, scores)
@@ -177,12 +222,19 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "status": "validation_only_phase3_crossencoder",
         "input": str(args.input),
         "model": args.model,
-        "objective": "writer_utility_soft_binary_regression_0_to_1",
+        "objective": (
+            "pretrained_reranker_score"
+            if no_finetune
+            else "writer_utility_soft_binary_regression_0_to_1"
+        ),
+        "finetuned": not no_finetune,
+        "model_fit_pair_count": model_fit_pair_count,
+        "device": str(getattr(model, "device", "unknown")),
         "train_pair_count": len(train),
         "validation_pair_count": len(validation),
         "train_query_count": len({row["query_id"] for row in train}),
         "validation_query_count": len({row["query_id"] for row in validation}),
-        "epochs": args.epochs,
+        "epochs": 0 if no_finetune else args.epochs,
         "batch_size": args.batch_size,
         "eval_batch_size": args.eval_batch_size,
         "learning_rate": args.learning_rate,
@@ -190,6 +242,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "warmup_steps": warmup_steps,
         "max_length": args.max_length,
         "seed": args.seed,
+        "validation_score_output": str(score_output) if score_output else None,
         "baseline_v25": baseline_summary,
         "cross_encoder_utility": candidate_summary,
         "delta_vs_v25": _delta_summary(candidate_summary, baseline_summary),
@@ -235,6 +288,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--output",
         default="evaluation/writer_relevance_phase3_crossencoder_report.json",
     )
+    parser.add_argument("--score-output", default=None)
     parser.add_argument("--model-output", default=None)
     parser.add_argument(
         "--learned-floor-report",
@@ -248,6 +302,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--warmup-ratio", type=float, default=0.1)
     parser.add_argument("--max-length", type=int, default=384)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument("--device", default=None)
+    parser.add_argument("--trust-remote-code", action="store_true")
+    parser.add_argument("--use-amp", action="store_true")
+    parser.add_argument(
+        "--no-finetune",
+        action="store_true",
+        help="Score validation with the pretrained reranker without fitting train labels.",
+    )
     parser.add_argument("--include-per-query", action="store_true")
     parser.add_argument("--no-progress", action="store_true")
     return parser

@@ -11,6 +11,7 @@ import numpy as np
 
 from scripts.writer_relevance_phase3_crossencoder import (
     _delta_summary,
+    _write_score_output,
     text_pair,
     utility_target,
     run,
@@ -63,6 +64,7 @@ def _row(
 class FakeModel:
     def __init__(self) -> None:
         self.seen_pairs: list[tuple[str, str]] = []
+        self.device = "cpu"
 
     def predict(self, pairs, **kwargs):
         self.seen_pairs = list(pairs)
@@ -103,6 +105,20 @@ class WriterRelevancePhase3CrossEncoderTests(unittest.TestCase):
         delta = _delta_summary(candidate, reference)
         self.assertAlmostEqual(delta["ndcg_at_k_mean"], 0.1)
         self.assertAlmostEqual(delta["severe_error_rate_at_k_mean"], -0.03)
+
+    def test_validation_score_artifact_contains_no_human_labels(self) -> None:
+        rows = [_row("valid#1", 1, 3, "direct", "validation")]
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "scores.jsonl"
+            _write_score_output(output, rows, np.asarray([0.75]), model="fake/model")
+            payload = json.loads(output.read_text(encoding="utf-8"))
+
+        self.assertEqual(payload["pair_id"], rows[0]["pair_id"])
+        self.assertEqual(payload["split"], "validation")
+        self.assertEqual(payload["model"], "fake/model")
+        self.assertNotIn("annotation", payload)
+        self.assertNotIn("utility", payload)
+        self.assertNotIn("semantic_relation", payload)
 
     def test_run_never_trains_or_predicts_on_benchmark_rows(self) -> None:
         rows = [
@@ -173,6 +189,79 @@ class WriterRelevancePhase3CrossEncoderTests(unittest.TestCase):
         self.assertEqual(report["benchmark_pairs_used_for_training"], 0)
         self.assertFalse(report["benchmark_split_evaluated"])
         self.assertIn("delta_vs_learned_floor", report)
+
+    def test_no_finetune_scores_validation_without_fitting_train_labels(self) -> None:
+        rows = [
+            _row("train#1", 1, 3, "direct", "train"),
+            _row("train#1", 2, 0, "unrelated", "train"),
+            _row("valid#1", 1, 3, "direct", "validation"),
+            _row("valid#1", 2, 0, "unrelated", "validation"),
+            _row("benchmark-secret#1", 1, 3, "direct", "benchmark"),
+        ]
+        fake_model = FakeModel()
+        floor = {
+            "ordinal_minus_severe": {
+                "useful_rate_at_k_mean": 0.5,
+                "high_utility_rate_at_k_mean": 0.5,
+                "noise_rate_at_k_mean": 0.5,
+                "severe_error_rate_at_k_mean": 0.5,
+                "relation_diversity_at_k_mean": 1.0,
+                "ndcg_at_k_mean": 0.5,
+                "mrr_high_utility_mean": 1.0,
+            }
+        }
+
+        with tempfile.TemporaryDirectory() as directory:
+            directory_path = Path(directory)
+            input_path = directory_path / "rows.jsonl"
+            floor_path = directory_path / "floor.json"
+            score_path = directory_path / "scores.jsonl"
+            with input_path.open("w", encoding="utf-8") as handle:
+                for row in rows:
+                    handle.write(json.dumps(row, ensure_ascii=False) + "\n")
+            floor_path.write_text(json.dumps(floor), encoding="utf-8")
+
+            args = SimpleNamespace(
+                input=str(input_path),
+                output=None,
+                score_output=str(score_path),
+                model="fake/model",
+                model_output=None,
+                learned_floor_report=str(floor_path),
+                k=2,
+                epochs=2,
+                batch_size=2,
+                eval_batch_size=2,
+                learning_rate=2e-5,
+                warmup_ratio=0.1,
+                max_length=128,
+                seed=42,
+                device=None,
+                trust_remote_code=False,
+                use_amp=False,
+                no_finetune=True,
+                include_per_query=False,
+                no_progress=True,
+            )
+            with patch(
+                "scripts.writer_relevance_phase3_crossencoder._load_model",
+                return_value=fake_model,
+            ), patch(
+                "scripts.writer_relevance_phase3_crossencoder._fit_model"
+            ) as fit_mock:
+                report = run(args)
+
+            score_rows = [
+                json.loads(line)
+                for line in score_path.read_text(encoding="utf-8").splitlines()
+            ]
+
+        fit_mock.assert_not_called()
+        self.assertFalse(report["finetuned"])
+        self.assertEqual(report["model_fit_pair_count"], 0)
+        self.assertEqual({row["split"] for row in score_rows}, {"validation"})
+        self.assertEqual(len(score_rows), 2)
+        self.assertNotIn("benchmark-secret", json.dumps(score_rows, ensure_ascii=False))
 
 
 if __name__ == "__main__":
