@@ -7,7 +7,11 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from scripts.substitutability_benchmark import annotate_interactively, export_candidates
+from scripts.substitutability_benchmark import (
+    annotate_interactively,
+    export_candidates,
+    migrate_v2_to_v3,
+)
 from thai_substitutability import (
     SCHEMA_VERSION,
     benchmark_metrics,
@@ -20,19 +24,22 @@ def _row(
     *,
     query_id: str,
     rank: int,
-    utility: int,
-    relation: str,
+    utility: int | None,
+    semantic_relation: str | None,
+    style_tags: list[str] | None = None,
 ) -> dict:
     return {
         "schema_version": SCHEMA_VERSION,
         "pair_id": f"{query_id}-{rank}",
         "query_id": query_id,
-        "query": {"word": query_id, "sense": 1, "definition": "target"},
+        "query": {"word": query_id.split("#")[0], "sense": 1, "definition": "target"},
         "candidate": {"word": f"c{rank}", "sense": 1, "definition": "candidate"},
         "retrieval": {"v25_rank": rank},
         "annotation": {
             "utility": utility,
-            "relation": relation,
+            "semantic_relation": semantic_relation,
+            "style_tags": style_tags,
+            "legacy_relation": None,
             "notes": "",
         },
         "split": "benchmark",
@@ -62,17 +69,19 @@ class SubstitutabilityBenchmarkTests(unittest.TestCase):
         row = _row(
             query_id="ฝน#1",
             rank=1,
-            utility=2,
-            relation="manner_action",
+            utility=3,
+            semantic_relation="manner_action",
+            style_tags=[],
         )
         self.assertEqual(validate_annotation_row(row), [])
 
-    def test_scene_context_can_be_high_utility(self) -> None:
+    def test_subtype_can_have_zero_utility(self) -> None:
         row = _row(
             query_id="ฝน#1",
             rank=1,
-            utility=2,
-            relation="scene_context",
+            utility=0,
+            semantic_relation="subtype",
+            style_tags=[],
         )
         self.assertEqual(validate_annotation_row(row), [])
 
@@ -83,23 +92,49 @@ class SubstitutabilityBenchmarkTests(unittest.TestCase):
                     query_id="เร็ว#1",
                     rank=1,
                     utility=2,
-                    relation=relation,
+                    semantic_relation=relation,
+                    style_tags=[],
                 )
                 errors = validate_annotation_row(row)
                 self.assertTrue(
                     any("requires utility 0" in error for error in errors)
                 )
 
-    def test_utility_zero_is_allowed_for_weak_relation(self) -> None:
+    def test_multiple_style_tags_are_allowed(self) -> None:
         row = _row(
             query_id="ฝน#1",
             rank=1,
-            utility=0,
-            relation="weak_related",
+            utility=3,
+            semantic_relation="direct",
+            style_tags=["literary", "archaic"],
         )
         self.assertEqual(validate_annotation_row(row), [])
 
-    def test_export_builds_writer_relevance_annotation_rows(self) -> None:
+    def test_unknown_style_cannot_mix_with_other_tags(self) -> None:
+        row = _row(
+            query_id="ฝน#1",
+            rank=1,
+            utility=1,
+            semantic_relation="weak_related",
+            style_tags=["unknown", "literary"],
+        )
+        errors = validate_annotation_row(row)
+        self.assertTrue(any("cannot be combined" in error for error in errors))
+
+    def test_partial_migrated_row_is_valid_template(self) -> None:
+        row = _row(
+            query_id="ฝน#1",
+            rank=1,
+            utility=3,
+            semantic_relation=None,
+            style_tags=None,
+        )
+        self.assertEqual(
+            validate_annotation_row(row, require_labels=False),
+            [],
+        )
+
+    def test_export_builds_schema_v3_annotation_rows(self) -> None:
         result = {
             "word": "พิรุณ",
             "score": 0.03,
@@ -167,12 +202,13 @@ class SubstitutabilityBenchmarkTests(unittest.TestCase):
 
         rows = captured["rows"]
         self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0]["schema_version"], SCHEMA_VERSION)
+        self.assertEqual(rows[0]["schema_version"], 3)
         self.assertEqual(rows[0]["query_id"], "ฝน#1")
         self.assertEqual(rows[0]["candidate"]["word"], "พิรุณ")
         self.assertEqual(rows[0]["retrieval"]["v25_rank"], 1)
         self.assertIsNone(rows[0]["annotation"]["utility"])
-        self.assertIsNone(rows[0]["annotation"]["relation"])
+        self.assertIsNone(rows[0]["annotation"]["semantic_relation"])
+        self.assertIsNone(rows[0]["annotation"]["style_tags"])
 
     def test_export_rejects_unpinned_ambiguous_target(self) -> None:
         searcher = _FakeSearcher([])
@@ -214,18 +250,56 @@ class SubstitutabilityBenchmarkTests(unittest.TestCase):
 
         self.assertEqual(searcher.calls, [])
 
-    def test_annotation_cli_autosaves_and_resumes(self) -> None:
+    def test_migrate_v2_preserves_utility_and_legacy_relation(self) -> None:
+        v2_row = {
+            "schema_version": 2,
+            "pair_id": "pair-test",
+            "query_id": "ฝน#1",
+            "query": {"word": "ฝน", "sense": 1, "definition": "น้ำที่ตกจากฟ้า"},
+            "candidate": {"word": "ฝนซู่", "sense": 1, "definition": "ฝนเม็ดใหญ่"},
+            "retrieval": {"v25_rank": 3},
+            "annotation": {
+                "utility": 2,
+                "relation": "manner_action",
+                "notes": "old note",
+            },
+            "split": None,
+        }
+
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "annotations.jsonl"
+            output = Path(directory) / "annotations.v3.jsonl"
+            source.write_text(
+                json.dumps(v2_row, ensure_ascii=False) + "\n",
+                encoding="utf-8",
+            )
+            args = SimpleNamespace(path=str(source), output=str(output))
+            migrate_v2_to_v3(args)
+
+            saved = json.loads(output.read_text(encoding="utf-8").strip())
+
+        self.assertEqual(saved["schema_version"], 3)
+        self.assertEqual(saved["annotation"]["utility"], 2)
+        self.assertEqual(
+            saved["annotation"]["legacy_relation"],
+            "manner_action",
+        )
+        self.assertIsNone(saved["annotation"]["semantic_relation"])
+        self.assertIsNone(saved["annotation"]["style_tags"])
+        self.assertEqual(saved["annotation"]["notes"], "old note")
+
+    def test_annotation_cli_preserves_migrated_utility_and_resumes(self) -> None:
         row = _row(
             query_id="ฝน#1",
             rank=1,
-            utility=0,
-            relation="unrelated",
+            utility=3,
+            semantic_relation=None,
+            style_tags=None,
         )
-        row["annotation"]["utility"] = None
-        row["annotation"]["relation"] = None
+        row["annotation"]["legacy_relation"] = "direct"
 
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / "annotations.jsonl"
+            path = Path(directory) / "annotations.v3.jsonl"
             path.write_text(
                 json.dumps(row, ensure_ascii=False) + "\n",
                 encoding="utf-8",
@@ -237,12 +311,14 @@ class SubstitutabilityBenchmarkTests(unittest.TestCase):
                 limit=None,
             )
 
-            with patch("builtins.input", side_effect=["2", "4"]):
+            # Utility=3 is preserved. 1=direct, 1=literary.
+            with patch("builtins.input", side_effect=["1", "1"]):
                 annotate_interactively(args)
 
             saved = json.loads(path.read_text(encoding="utf-8").strip())
-            self.assertEqual(saved["annotation"]["utility"], 2)
-            self.assertEqual(saved["annotation"]["relation"], "manner_action")
+            self.assertEqual(saved["annotation"]["utility"], 3)
+            self.assertEqual(saved["annotation"]["semantic_relation"], "direct")
+            self.assertEqual(saved["annotation"]["style_tags"], ["literary"])
 
             with patch("builtins.input") as mocked_input:
                 annotate_interactively(args)
@@ -250,10 +326,34 @@ class SubstitutabilityBenchmarkTests(unittest.TestCase):
 
     def test_metrics_measure_writer_utility_and_severe_errors(self) -> None:
         rows = [
-            _row(query_id="ฝน#1", rank=1, utility=2, relation="manner_action"),
-            _row(query_id="ฝน#1", rank=2, utility=3, relation="direct"),
-            _row(query_id="ฝน#1", rank=3, utility=2, relation="scene_context"),
-            _row(query_id="ฝน#1", rank=4, utility=0, relation="unrelated"),
+            _row(
+                query_id="ฝน#1",
+                rank=1,
+                utility=2,
+                semantic_relation="manner_action",
+                style_tags=[],
+            ),
+            _row(
+                query_id="ฝน#1",
+                rank=2,
+                utility=3,
+                semantic_relation="direct",
+                style_tags=["literary"],
+            ),
+            _row(
+                query_id="ฝน#1",
+                rank=3,
+                utility=2,
+                semantic_relation="scene_context",
+                style_tags=[],
+            ),
+            _row(
+                query_id="ฝน#1",
+                rank=4,
+                utility=0,
+                semantic_relation="unrelated",
+                style_tags=[],
+            ),
         ]
 
         report = benchmark_metrics(rows, k=4)
