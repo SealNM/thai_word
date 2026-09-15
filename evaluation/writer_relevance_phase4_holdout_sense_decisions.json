@@ -1,0 +1,108 @@
+{
+  "status": "phase4_holdout_sense_decisions_locked",
+  "reviewed_date": "2026-09-16",
+  "review_basis": "Dictionary definitions from the V1 lexical artifact only; no V2.5 candidate list or writer-reranker output was used.",
+  "config_sha256": "6b2a1ebe8483ab704c49a29da3524f8abcf55505abbae4bbf5ed6e699c3a9855",
+  "decisions": [
+    {
+      "query": "ทะเล",
+      "sense": 1,
+      "rationale": "ตรงกับห้วงน้ำเค็มกว้างใหญ่; sense 2 เป็นคำประกอบหมายถึงสิ่งที่อยู่หรือเกิดในทะเล"
+    },
+    {
+      "query": "ภูเขา",
+      "sense": 1,
+      "rationale": "มี sense เดียวและตรง intended meaning"
+    },
+    {
+      "query": "แม่น้ำ",
+      "sense": 1,
+      "rationale": "มี sense เดียวและตรง intended meaning"
+    },
+    {
+      "query": "ดอกไม้",
+      "sense": 2,
+      "rationale": "cross-reference ไป ดอก ๑ ซึ่งเป็นความหมายดอกของพืช; sense 1 คือฟันเด็ก และ sense 3 อ้างนวลจันทร์"
+    },
+    {
+      "query": "เงา",
+      "sense": 1,
+      "rationale": "ตรงกับส่วนมืดจากวัตถุบังแสง"
+    },
+    {
+      "query": "กอด",
+      "sense": 1,
+      "rationale": "มี sense เดียวและตรงโอบไว้ในวงแขน"
+    },
+    {
+      "query": "จูบ",
+      "sense": 1,
+      "rationale": "มี sense เดียวและเป็นการสัมผัสเพื่อแสดงความรัก/ใคร่"
+    },
+    {
+      "query": "ก้ม",
+      "sense": 1,
+      "rationale": "มี sense เดียวและตรงการน้อมหัว/หน้า/หลังลง"
+    },
+    {
+      "query": "หัน",
+      "sense": 1,
+      "rationale": "ตรงกับเปลี่ยนจากทิศทางหนึ่งไปอีกทิศทางหนึ่ง"
+    },
+    {
+      "query": "หลบ",
+      "sense": 1,
+      "rationale": "ตรงกับหลีก/เลี่ยงให้พ้น; sense 2 เน้นแอบ"
+    },
+    {
+      "query": "เงียบ",
+      "sense": 1,
+      "rationale": "ตรงกับไม่มีเสียง/สงบ/ปราศจากเสียงรบกวน"
+    },
+    {
+      "query": "แห้ง",
+      "sense": 1,
+      "rationale": "ตรงกับไม่มีน้ำ/ไม่เปียกตาม intended meaning กว้าง"
+    },
+    {
+      "query": "หนัก",
+      "sense": 1,
+      "rationale": "ตรงกับมีน้ำหนักมาก"
+    },
+    {
+      "query": "เบา",
+      "sense": 1,
+      "rationale": "ตรงกับมีน้ำหนักน้อย"
+    },
+    {
+      "query": "หวาน",
+      "sense": 1,
+      "rationale": "ตรงกับรสอย่างรสน้ำตาล"
+    },
+    {
+      "query": "คิดถึง",
+      "sense": 1,
+      "rationale": "มี sense เดียวและตรงนึกถึงด้วยใจผูกพัน"
+    },
+    {
+      "query": "หวัง",
+      "sense": 1,
+      "rationale": "มี sense เดียวและตรงคาดว่าจะได้/ปองไว้/หมายไว้"
+    },
+    {
+      "query": "หึง",
+      "sense": 1,
+      "rationale": "ตรงกับหวงแหนทางชู้สาว"
+    },
+    {
+      "query": "สงสัย",
+      "sense": 1,
+      "rationale": "ตรงกับไม่แน่ใจในข้อเท็จจริง/ลังเลตาม intended meaning มากที่สุด"
+    },
+    {
+      "query": "กังวล",
+      "sense": 1,
+      "rationale": "มี sense เดียวและตรงห่วงใย/มีใจพะวง"
+    }
+  ]
+}

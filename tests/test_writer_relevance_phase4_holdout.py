@@ -10,6 +10,7 @@ from scripts.writer_relevance_phase4_holdout import (
     EXPECTED_GROUPS,
     EXPECTED_PAIR_COUNT,
     TARGET_COUNT,
+    apply_sense_decisions,
     freeze_targets,
     validate_target_config,
 )
@@ -17,6 +18,7 @@ from scripts.writer_relevance_phase4_holdout import (
 
 TARGET_FILE = Path("evaluation/writer_relevance_phase4_holdout_targets.json")
 OLD_TARGET_FILE = Path("evaluation/writer_relevance_50_targets.json")
+DECISIONS_FILE = Path("evaluation/writer_relevance_phase4_holdout_sense_decisions.json")
 
 
 class Phase4HoldoutTests(unittest.TestCase):
@@ -46,6 +48,39 @@ class Phase4HoldoutTests(unittest.TestCase):
         errors = validate_target_config(config, old_targets=old_targets)
 
         self.assertTrue(any("overlap" in error.lower() for error in errors))
+
+    def test_locked_sense_decisions_cover_all_targets(self) -> None:
+        config = json.loads(TARGET_FILE.read_text(encoding="utf-8"))
+        decisions = json.loads(DECISIONS_FILE.read_text(encoding="utf-8"))
+
+        self.assertEqual(len(decisions["decisions"]), TARGET_COUNT)
+        self.assertEqual(
+            {item["query"] for item in decisions["decisions"]},
+            {item["query"] for item in config["queries"]},
+        )
+        self.assertTrue(all(isinstance(item["sense"], int) for item in decisions["decisions"]))
+
+    def test_apply_decisions_rejects_sense_not_in_inspection(self) -> None:
+        decisions = json.loads(DECISIONS_FILE.read_text(encoding="utf-8"))
+        report = {
+            "targets": [
+                {
+                    "query": item["query"],
+                    "recommended_sense": None,
+                    "senses": [{"sense": 1, "definition": "test"}],
+                }
+                for item in decisions["decisions"]
+            ]
+        }
+        broken = json.loads(json.dumps(decisions, ensure_ascii=False))
+        broken["decisions"][0]["sense"] = 999
+
+        with self.assertRaisesRegex(ValueError, "not present in inspected senses"):
+            apply_sense_decisions(
+                report,
+                broken,
+                expected_config_sha256=decisions["config_sha256"],
+            )
 
     def test_freeze_rejects_unreviewed_senses(self) -> None:
         config = json.loads(TARGET_FILE.read_text(encoding="utf-8"))

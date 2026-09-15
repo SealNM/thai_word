@@ -115,6 +115,79 @@ def validate_target_config(
     return errors
 
 
+def apply_sense_decisions(
+    report: dict[str, Any],
+    decisions: dict[str, Any],
+    *,
+    expected_config_sha256: str,
+) -> dict[str, Any]:
+    if decisions.get("config_sha256") != expected_config_sha256:
+        raise ValueError(
+            "Sense decisions were created for a different target config hash."
+        )
+
+    items = decisions.get("decisions")
+    if not isinstance(items, list):
+        raise ValueError("Sense decisions file must contain a decisions array.")
+    if len(items) != TARGET_COUNT:
+        raise ValueError(
+            f"Sense decisions must contain exactly {TARGET_COUNT} targets; "
+            f"found {len(items)}."
+        )
+
+    decision_map: dict[str, int] = {}
+    for item in items:
+        if not isinstance(item, dict):
+            raise ValueError("Each sense decision must be an object.")
+        query = str(item.get("query", "")).strip()
+        sense = item.get("sense")
+        if not query or not isinstance(sense, int):
+            raise ValueError("Each sense decision requires query and integer sense.")
+        if query in decision_map:
+            raise ValueError(f"Duplicate sense decision for {query!r}.")
+        decision_map[query] = sense
+
+    targets = report.get("targets")
+    if not isinstance(targets, list):
+        raise ValueError("Sense report must contain targets array.")
+
+    report_words = {
+        str(item.get("query", "")).strip()
+        for item in targets
+        if isinstance(item, dict)
+    }
+    if set(decision_map) != report_words:
+        missing = sorted(report_words - set(decision_map))
+        extra = sorted(set(decision_map) - report_words)
+        raise ValueError(
+            "Sense decisions must cover exactly the inspected targets. "
+            f"missing={missing}, extra={extra}"
+        )
+
+    for target in targets:
+        query = str(target.get("query", "")).strip()
+        selected = decision_map[query]
+        senses = target.get("senses")
+        if not isinstance(senses, list) or not any(
+            isinstance(item, dict) and int(item.get("sense", -1)) == selected
+            for item in senses
+        ):
+            raise ValueError(
+                f"{query}: decided sense {selected} is not present in inspected senses."
+            )
+        target["recommended_sense"] = selected
+        if len(senses) > 1:
+            target["status"] = "reviewed"
+        else:
+            target["status"] = "unique"
+
+    report["status"] = "phase4_holdout_sense_review_complete"
+    report["resolved_count"] = TARGET_COUNT
+    report["needs_review_count"] = 0
+    report["missing_headword_count"] = 0
+    return report
+
+
 def inspect_targets(args: argparse.Namespace) -> dict[str, Any]:
     config = _read_json(args.config)
     old_targets = _read_json(args.old_targets)
@@ -188,6 +261,15 @@ def freeze_targets(args: argparse.Namespace) -> dict[str, Any]:
         raise ValueError(
             "Target config changed after sense inspection. "
             "Re-run inspection; do not silently replace holdout headwords."
+        )
+
+    decisions = None
+    if args.decisions:
+        decisions = _read_json(args.decisions)
+        report = apply_sense_decisions(
+            report,
+            decisions,
+            expected_config_sha256=actual_config_hash,
         )
 
     report_targets = report.get("targets")
@@ -273,6 +355,10 @@ def freeze_targets(args: argparse.Namespace) -> dict[str, Any]:
         "headword_source_sha256": actual_config_hash,
         "sense_report_file": str(args.report),
         "sense_report_sha256": _sha256_file(args.report),
+        "sense_decisions_file": str(args.decisions) if args.decisions else None,
+        "sense_decisions_sha256": (
+            _sha256_file(args.decisions) if args.decisions else None
+        ),
         "old_targets_file": str(args.old_targets),
         "old_targets_sha256": _sha256_file(args.old_targets),
         "target_count": TARGET_COUNT,
@@ -458,6 +544,11 @@ def build_parser() -> argparse.ArgumentParser:
     freeze = subparsers.add_parser("freeze", help="Freeze reviewed sense IDs before candidate export.")
     freeze.add_argument("--config", default="evaluation/writer_relevance_phase4_holdout_targets.json")
     freeze.add_argument("--report", default="evaluation/writer_relevance_phase4_holdout_sense_report.json")
+    freeze.add_argument(
+        "--decisions",
+        default="evaluation/writer_relevance_phase4_holdout_sense_decisions.json",
+        help="Reviewed query->sense decisions locked from dictionary definitions only.",
+    )
     freeze.add_argument("--old-targets", default="evaluation/writer_relevance_50_targets.json")
     freeze.add_argument("--output", default="evaluation/writer_relevance_phase4_holdout_frozen_queries.json")
     freeze.add_argument("--manifest", default="evaluation/writer_relevance_phase4_holdout_manifest.json")

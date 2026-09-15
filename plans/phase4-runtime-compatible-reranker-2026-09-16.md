@@ -1,7 +1,7 @@
 # Thai Words — Phase 4 Runtime-Compatible Writer Reranker Plan
 
 Date: 2026-09-16  
-Status: **In progress — Waves A-G complete; Wave H headword set frozen, sense review pending**  
+Status: **In progress — Waves A-G complete; Wave H senses reviewed and locked, freeze/export pending**  
 Base commit: `959c502254529e7260fdbf98a615b0e4e7858145`  
 Working branch: `feat/phase4-runtime-compatible-reranker-2026-09-16`
 
@@ -1261,3 +1261,79 @@ For targets with exactly one dictionary sense, the script fills `recommended_sen
 For `needs_review` targets, review only the dictionary definitions and set `recommended_sense` in the sense report. Do **not** run candidate export or writer reranking before all 20 senses are pinned.
 
 Only after that review should `freeze` be run.
+
+
+## Wave H sense review — decisions locked
+
+The 20-target sense inspection completed with:
+
+- **20/20** headwords found;
+- **8** unique-sense targets resolved automatically;
+- **12** multi-sense targets reviewed manually;
+- **0** missing headwords;
+- no V2.5 candidate list, learned score, neural score, hybrid score, or quality metric was consulted during sense selection.
+
+Locked decisions are stored in:
+
+- `evaluation/writer_relevance_phase4_holdout_sense_decisions.json`
+
+Pinned target senses:
+
+```text
+ทะเล#1
+ภูเขา#1
+แม่น้ำ#1
+ดอกไม้#2
+เงา#1
+
+กอด#1
+จูบ#1
+ก้ม#1
+หัน#1
+หลบ#1
+
+เงียบ#1
+แห้ง#1
+หนัก#1
+เบา#1
+หวาน#1
+
+คิดถึง#1
+หวัง#1
+หึง#1
+สงสัย#1
+กังวล#1
+```
+
+Notable reviewed choices:
+
+- `ทะเล#1` — the large salt-water body; sense 2 is adjectival/compound usage;
+- `ดอกไม้#2` — the dictionary cross-reference to `ดอก ๑`; the other senses are not the plant-flower concept;
+- `เงา#1` — the dark shape caused by blocking light;
+- `หัน#1` — change from one direction to another;
+- `หลบ#1` — avoid/evade; sense 2 is specifically hide;
+- `เงียบ#1` — no sound / quiet;
+- `แห้ง#1` — no water / not wet;
+- `หนัก#1` — heavy by weight;
+- `เบา#1` — light by weight;
+- `หวาน#1` — sugar-like taste;
+- `หึง#1` — romantic jealousy;
+- `สงสัย#1` — uncertainty/doubt matching the intended concept.
+
+The freeze command now accepts the locked decisions file directly and validates every chosen sense against the original sense-inspection report. This avoids manual edits to the generated report while preserving the original inspection evidence.
+
+Next command:
+
+```bash
+python -m scripts.writer_relevance_phase4_holdout freeze \
+  --config evaluation/writer_relevance_phase4_holdout_targets.json \
+  --report evaluation/writer_relevance_phase4_holdout_sense_report.json \
+  --decisions evaluation/writer_relevance_phase4_holdout_sense_decisions.json \
+  --old-targets evaluation/writer_relevance_50_targets.json \
+  --output evaluation/writer_relevance_phase4_holdout_frozen_queries.json \
+  --manifest evaluation/writer_relevance_phase4_holdout_manifest.json
+```
+
+The freeze step records the decisions-file SHA-256 in the holdout manifest.
+
+Only after freeze succeeds should V2.5 candidate export run.
