@@ -12,6 +12,70 @@ from thai_lexical_v1 import list_senses, load_artifacts
 from thai_writer_search import DEFAULT_RERANK_POOL, RERANKER_MODES, WriterSearch
 
 
+def _missing_base_artifacts(index: str | Path, dense_index: str | Path) -> list[str]:
+    index_path = Path(index)
+    dense_path = Path(dense_index)
+    required = [
+        index_path / "entries.json",
+        index_path / "senses.json",
+        index_path / "metadata.json",
+        dense_path / "dense_metadata.json",
+        dense_path / "dense_embeddings.npy",
+    ]
+    return [str(path) for path in required if not path.exists()]
+
+
+def _base_artifact_error(
+    *,
+    index: str | Path,
+    dense_index: str | Path,
+    dense_device: str | None,
+) -> str:
+    missing = _missing_base_artifacts(index, dense_index)
+    if not missing:
+        return ""
+
+    device = dense_device or "cuda"
+    missing_lines = "\n".join(f"  - {path}" for path in missing)
+    return (
+        "Thai Words base retrieval artifacts are missing.\n"
+        "Writer reranker fallback still requires the V2.5 base index.\n\n"
+        "Missing files:\n"
+        f"{missing_lines}\n\n"
+        "Build them with:\n"
+        f"  python scripts/build_index.py --output {index}\n"
+        "  python scripts/build_dense_index.py "
+        f"--index {index} --model embeddinggemma-300m-256 "
+        f"--output {dense_index} --device {device}\n\n"
+        "These are V1/V2.5 retrieval artifacts, not the writer-reranker checkpoint."
+    )
+
+
+def _validate_base_artifacts(
+    *,
+    index: str | Path,
+    dense_index: str | Path,
+    dense_device: str | None,
+) -> None:
+    message = _base_artifact_error(
+        index=index,
+        dense_index=dense_index,
+        dense_device=dense_device,
+    )
+    if message:
+        raise SystemExit(message)
+
+
+def _validate_lexical_artifact(index: str | Path) -> None:
+    entries = Path(index) / "entries.json"
+    if entries.exists():
+        return
+    raise SystemExit(
+        "V1 lexical artifact is missing. Build it first with:\n"
+        f"  python scripts/build_index.py --output {index}"
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Search Thai Words with the Phase-4 writer reranker."
@@ -45,10 +109,17 @@ def build_parser() -> argparse.ArgumentParser:
 
 def run(args: argparse.Namespace):
     if args.list_senses:
+        _validate_lexical_artifact(args.index)
         lexical = load_artifacts(args.index)
         payload = list_senses(lexical, args.query)
         print(json.dumps(payload, ensure_ascii=False, indent=2))
         return payload
+
+    _validate_base_artifacts(
+        index=args.index,
+        dense_index=args.dense_index,
+        dense_device=args.dense_device,
+    )
 
     searcher = WriterSearch.from_paths(
         lexical_index=args.index,

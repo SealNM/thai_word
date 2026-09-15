@@ -150,6 +150,7 @@ class WriterSearchModesTests(unittest.TestCase):
             ]
         )
         with (
+            patch("scripts.search_writer._validate_lexical_artifact"),
             patch("scripts.search_writer.load_artifacts", return_value="LEXICAL"),
             patch(
                 "scripts.search_writer.list_senses",

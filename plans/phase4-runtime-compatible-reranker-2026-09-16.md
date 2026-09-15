@@ -934,3 +934,48 @@ python -m scripts.profile_writer_runtime "ฝน" \
 The previously observed neural checkpoint load component of **13.910393 s** remains a useful comparison point, but the profiler should be treated as the canonical Wave G measurement.
 
 Wave G decision must be based on runtime/resource practicality only. Do not change alpha/model architecture from these measurements. If the 2GB reranker is operationally too expensive, compression/distillation becomes a future model iteration requiring the fresh Phase 4 holdout.
+
+
+### Kaggle base-artifact preflight incident
+
+The first end-to-end `search_writer.py` run on a fresh Kaggle session failed before V2.5 retrieval:
+
+```text
+FileNotFoundError: artifacts/v1/entries.json
+```
+
+Cause:
+
+- writer reranker artifacts and the V1/V2.5 retrieval artifacts are separate;
+- the current Kaggle session had the learned/neural writer artifacts, but not `artifacts/v1`;
+- `optional` mode can only fall back to V2.5 when V2.5 itself is available.
+
+This is an environment/artifact setup issue, not a writer-ranker regression.
+
+CLI hardening:
+
+- `scripts/search_writer.py` now preflights the base retrieval files before constructing `WriterSearch`;
+- required lexical files:
+  - `entries.json`
+  - `senses.json`
+  - `metadata.json`
+- required dense files:
+  - `dense_metadata.json`
+  - `dense_embeddings.npy`
+- a missing base artifact now returns concise deterministic rebuild commands rather than a low-level traceback;
+- the CLI intentionally does not auto-build the dense index because building embeddings may be expensive and should remain explicit;
+- `--list-senses` checks only the lexical artifact and still bypasses dense/neural loading.
+
+Canonical rebuild:
+
+```bash
+python scripts/build_index.py --output artifacts/v1
+
+python scripts/build_dense_index.py \
+  --index artifacts/v1 \
+  --model embeddinggemma-300m-256 \
+  --output artifacts/v2/embeddinggemma-300m-256 \
+  --device cuda
+```
+
+The writer learned artifact and Phase 3 neural checkpoint do not need to be rebuilt.
