@@ -1,7 +1,7 @@
 # Thai Words — Phase 4 Runtime-Compatible Writer Reranker Plan
 
 Date: 2026-09-16  
-Status: **In progress — Waves A-F runtime integration implemented; Wave G performance gate pending**  
+Status: **In progress — Waves A-F complete; Wave G profiler implemented and awaiting real measurements**  
 Base commit: `959c502254529e7260fdbf98a615b0e4e7858145`  
 Working branch: `feat/phase4-runtime-compatible-reranker-2026-09-16`
 
@@ -864,3 +864,73 @@ Focused tests cover:
 - CLI default mode = optional.
 
 Next: Wave G runtime profiling with real artifacts. No ranking parameter/model changes are permitted as part of that profiling.
+
+
+## Wave G implementation checkpoint — runtime profiler
+
+Added:
+
+- `scripts/profile_writer_runtime.py`
+- `tests/test_writer_runtime_profile.py`
+
+The profiler does **not** evaluate quality and does not reference the consumed Phase 3 benchmark for selection.
+
+It measures:
+
+1. startup time excluding lazy neural weights;
+2. V2.5 top-N search latency;
+3. persisted learned-score latency;
+4. first full writer search latency (cold neural path);
+5. neural model load seconds reported by `NeuralWriterRanker`;
+6. warm 30-pair neural scoring latency across repeated runs;
+7. warm full writer-search latency across repeated runs;
+8. process peak RSS;
+9. CUDA allocated/reserved and peak allocated/reserved memory;
+10. cold result words for sanity only.
+
+The profiler records:
+
+```json
+{
+  "quality_selection_performed": false,
+  "phase3_benchmark_used": false
+}
+```
+
+GPU example:
+
+```bash
+python -m scripts.profile_writer_runtime "ฝน" \
+  --index artifacts/v1 \
+  --dense-index artifacts/v2/embeddinggemma-300m-256 \
+  --learned-ranker artifacts/writer-reranker \
+  --neural-model artifacts/phase3/bge-reranker-v2-m3-locked \
+  --sense 1 \
+  --top-k 10 \
+  --rerank-pool 30 \
+  --repeats 5 \
+  --dense-device cuda \
+  --neural-device cuda \
+  --output evaluation/writer_relevance_phase4_runtime_profile_gpu.json
+```
+
+CPU comparison:
+
+```bash
+python -m scripts.profile_writer_runtime "ฝน" \
+  --index artifacts/v1 \
+  --dense-index artifacts/v2/embeddinggemma-300m-256 \
+  --learned-ranker artifacts/writer-reranker \
+  --neural-model artifacts/phase3/bge-reranker-v2-m3-locked \
+  --sense 1 \
+  --top-k 10 \
+  --rerank-pool 30 \
+  --repeats 3 \
+  --dense-device cpu \
+  --neural-device cpu \
+  --output evaluation/writer_relevance_phase4_runtime_profile_cpu.json
+```
+
+The previously observed neural checkpoint load component of **13.910393 s** remains a useful comparison point, but the profiler should be treated as the canonical Wave G measurement.
+
+Wave G decision must be based on runtime/resource practicality only. Do not change alpha/model architecture from these measurements. If the 2GB reranker is operationally too expensive, compression/distillation becomes a future model iteration requiring the fresh Phase 4 holdout.
