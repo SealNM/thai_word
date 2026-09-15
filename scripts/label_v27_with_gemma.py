@@ -58,6 +58,7 @@ def _prompt(seed: dict[str, Any], top_k: int) -> str:
             "",
             f"Return exactly the best {requested} candidate IDs.",
             "Output one JSON array only, for example: [3, 7, 1, 12]",
+            "Every returned ID must be unique. Never repeat an ID.",
             "Do not add explanations, markdown, labels, or scores.",
         ]
     )
@@ -155,6 +156,7 @@ class GemmaTeacher:
         seed: dict[str, Any],
         *,
         top_k: int,
+        attempt: int = 0,
     ) -> tuple[list[int], str]:
         prompt = _prompt(seed, top_k)
         messages = [
@@ -177,9 +179,10 @@ class GemmaTeacher:
         ).to(self.model.device)
         input_len = int(inputs["input_ids"].shape[-1])
 
-        self.torch.manual_seed(self.seed)
+        generation_seed = self.seed + max(0, int(attempt))
+        self.torch.manual_seed(generation_seed)
         if self.torch.cuda.is_available():
-            self.torch.cuda.manual_seed_all(self.seed)
+            self.torch.cuda.manual_seed_all(generation_seed)
 
         outputs = self.model.generate(
             **inputs,
@@ -222,6 +225,12 @@ def main() -> None:
     parser.add_argument("--device", default=None)
     parser.add_argument("--max-new-tokens", type=int, default=96)
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument(
+        "--max-attempts",
+        type=int,
+        default=3,
+        help="Retry incomplete/duplicate rankings up to this many generations.",
+    )
     parser.add_argument(
         "--limit",
         type=int,
@@ -297,14 +306,36 @@ def main() -> None:
             len(seed["candidates"]),
         )
         try:
-            ranking, raw = teacher.rank(
-                seed,
-                top_k=requested,
-            )
+            max_attempts = max(1, int(args.max_attempts))
+            ranking: list[int] = []
+            raw = ""
+            used_attempts = 0
+
+            for attempt in range(max_attempts):
+                used_attempts = attempt + 1
+                ranking, raw = teacher.rank(
+                    seed,
+                    top_k=requested,
+                    attempt=attempt,
+                )
+                if len(ranking) == requested:
+                    break
+
+                print(
+                    f"[{position}/{len(pending)}] "
+                    f"{seed['anchor']['word']}: retry "
+                    f"{used_attempts}/{max_attempts} — "
+                    f"expected {requested} unique IDs, "
+                    f"got {len(ranking)}; raw={raw[:180]!r}",
+                    file=sys.stderr,
+                    flush=True,
+                )
+
             if len(ranking) != requested:
                 raise ValueError(
-                    f"incomplete ranking: expected {requested} IDs, "
-                    f"got {len(ranking)}; raw={raw[:300]!r}"
+                    f"incomplete ranking after {used_attempts} attempts: "
+                    f"expected {requested} unique IDs, got {len(ranking)}; "
+                    f"raw={raw[:300]!r}"
                 )
 
             labeled = dict(seed)
@@ -315,6 +346,7 @@ def main() -> None:
                     timezone.utc
                 ).isoformat(),
                 "requested_count": requested,
+                "generation_attempts": used_attempts,
                 "ranking_indices": ranking,
                 "ranking_words": [
                     seed["candidates"][index]["word"]
