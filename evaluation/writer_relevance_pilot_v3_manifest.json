@@ -1,0 +1,46 @@
+{
+  "schema_version": 3,
+  "status": "approved_pilot_checkpoint",
+  "approved_date": "2026-09-16",
+  "source_file_name": "substitutability_annotations.v3.assistant_completed.corrected.jsonl",
+  "source_sha256": "158d1511f6deb7e688dbe768bf095e2b4c14517f27525721ba1bd03673dc5ff9",
+  "source_bytes": 343390,
+  "query_count": 10,
+  "pair_count": 300,
+  "candidates_per_query": 30,
+  "utility_distribution": {
+    "0": 21,
+    "1": 27,
+    "2": 67,
+    "3": 185
+  },
+  "semantic_relation_distribution": {
+    "direct": 128,
+    "subtype": 63,
+    "manner_action": 40,
+    "scene_context": 24,
+    "unrelated": 15,
+    "effect_state": 11,
+    "weak_related": 8,
+    "broader_concept": 6,
+    "sense_mismatch": 5
+  },
+  "style_tag_distribution": {
+    "literary": 142,
+    "archaic": 28,
+    "formal": 16,
+    "colloquial": 15,
+    "figurative": 13,
+    "dialect": 2
+  },
+  "top10_mean_metrics": {
+    "useful_rate": 0.95,
+    "high_utility_rate": 0.9,
+    "noise_rate": 0.05,
+    "severe_error_rate": 0.05,
+    "relation_diversity": 2.6,
+    "ndcg": 0.850987026156589,
+    "mrr_high_utility": 1
+  },
+  "note": "Pilot approved by the user after correction of บ้าน -> ที่ to utility 0 / unrelated. This pilot validates workflow and retrieval/ranking direction; it is not sufficient for model selection."
+}
