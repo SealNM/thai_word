@@ -1,7 +1,7 @@
 # Thai Words — Writer Lexical Relevance & Utility Ranking Plan
 
 Date: 2026-09-15  
-Status: **In progress — Phase 3 candidate locked; frozen benchmark pending reproducible checkpoint**  
+Status: **In progress — Phase 3 candidate locked and reproduced; frozen benchmark ready**  
 Baseline: `feat/dictionary-semantic-v2-5-embeddinggemma`  
 Working branch: `feat/dictionary-substitutability-benchmark`
 
@@ -1164,3 +1164,68 @@ python -m scripts.writer_relevance_phase3_frozen_benchmark \
 ```
 
 After this command is run once, treat the benchmark as opened. Do not change the locked candidate in response to that result.
+
+
+### Reproducible locked checkpoint accepted
+
+The locked one-epoch fine-tuned BGE configuration was rerun with `--model-output` so the exact benchmark candidate now exists as a saved checkpoint:
+
+- saved model: `artifacts/phase3/bge-reranker-v2-m3-locked`
+- model: `BAAI/bge-reranker-v2-m3`
+- training split: 31 queries / 930 pairs
+- benchmark rows used for training: 0
+- selected hybrid alpha: **0.5**, unchanged from model selection
+
+Saved-checkpoint reproduction validation:
+
+- Useful@10: **0.988889**
+- HighUtility@10: **0.977778**
+- Noise@10: **0.011111**
+- SevereError@10: **0.011111**
+- relation diversity: **2.555556**
+- NDCG@10: **0.913871**
+- MRR high utility: **1.000000**
+
+The earlier candidate-selection run produced NDCG **0.918968**. The saved-checkpoint rerun is lower by about **0.005097**, but it preserves the selected alpha, safety metrics, MRR, and still exceeds the pretrained-BGE hybrid incumbent NDCG **0.907113**.
+
+Saved-checkpoint leave-one-query-out stability:
+
+- alpha selection: **0.5 in 8/9 folds**, **0.3 in 1/9 fold**
+- positive-alpha folds: **9/9**
+- held-out NDCG: **5 wins / 3 ties / 1 loss**
+- mean held-out NDCG delta: **+0.019126**
+- minimum held-out NDCG delta: **-0.091648**
+- maximum held-out NDCG delta: **+0.078536**
+- held-out Noise regressions: **0/9**
+- held-out SevereError regressions: **0/9**
+- held-out diversity regressions: **4/9**
+- mean held-out diversity delta: **-0.444444**
+- stability gate: **PASS**
+
+Interpretation:
+
+- the training run is not numerically bit-identical across reruns, but the architecture and selected alpha are stable;
+- the reproduced checkpoint remains better than the pretrained hybrid on validation NDCG;
+- safety behavior remains unchanged;
+- the predeclared stability gate still passes;
+- this is sufficient to accept the saved checkpoint without any further tuning.
+
+Decision:
+
+> The Phase 3 candidate is now reproducibly locked. The frozen benchmark may be opened once using the existing one-shot harness and alpha **0.5**. Do not perform any additional validation-driven tuning before or after that benchmark evaluation.
+
+The frozen benchmark command remains:
+
+```bash
+python -m scripts.writer_relevance_phase3_frozen_benchmark \
+  --input evaluation/writer_relevance_50_annotations.approved.jsonl \
+  --candidate-manifest evaluation/writer_relevance_phase3_locked_candidate.json \
+  --split-manifest evaluation/writer_relevance_50_split_manifest.json \
+  --model-path artifacts/phase3/bge-reranker-v2-m3-locked \
+  --device cuda \
+  --include-per-query \
+  --confirm-frozen-benchmark \
+  --output evaluation/writer_relevance_phase3_frozen_benchmark_report.json
+```
+
+Once this command has been run, treat the benchmark as opened. Record the result, but do not use it to change alpha, model architecture, learning rate, epoch count, or other Phase 3 selection choices.

@@ -18,7 +18,7 @@
     "epochs": 1,
     "batch_size": 2,
     "eval_batch_size": 4,
-    "learning_rate": 1e-05,
+    "learning_rate": 0.00001,
     "warmup_ratio": 0.1,
     "max_length": 384,
     "seed": 42,
@@ -28,7 +28,7 @@
   },
   "learned_baseline": {
     "seed": 42,
-    "severe_penalty": 1.0,
+    "severe_penalty": 1,
     "training_split": "train"
   },
   "hybrid": {
@@ -46,7 +46,7 @@
     "severe_error_rate_at_k_mean": 0.011111111111111112,
     "relation_diversity_at_k_mean": 2.5555555555555554,
     "ndcg_at_k_mean": 0.9189680079616045,
-    "mrr_high_utility_mean": 1.0
+    "mrr_high_utility_mean": 1
   },
   "stability_checkpoint": {
     "positive_alpha_folds": 9,
@@ -66,5 +66,45 @@
     "no_alpha_search": true,
     "no_model_selection": true,
     "report_v25_learned_neural_and_locked_hybrid": true
+  },
+  "reproducibility_checkpoint": {
+    "status": "accepted",
+    "saved_model_path": "artifacts/phase3/bge-reranker-v2-m3-locked",
+    "validation": {
+      "useful_rate_at_k_mean": 0.9888888888888889,
+      "high_utility_rate_at_k_mean": 0.9777777777777779,
+      "noise_rate_at_k_mean": 0.011111111111111112,
+      "severe_error_rate_at_k_mean": 0.011111111111111112,
+      "relation_diversity_at_k_mean": 2.5555555555555554,
+      "ndcg_at_k_mean": 0.9138710114080071,
+      "mrr_high_utility_mean": 1,
+      "selected_alpha": 0.5
+    },
+    "stability": {
+      "positive_alpha_folds": 9,
+      "alpha_selection_counts": {
+        "0.3": 1,
+        "0.5": 8
+      },
+      "held_out_ndcg_wins": 5,
+      "held_out_ndcg_ties": 3,
+      "held_out_ndcg_losses": 1,
+      "mean_held_out_ndcg_delta": 0.019126395631926394,
+      "min_held_out_ndcg_delta": -0.091648441894985,
+      "max_held_out_ndcg_delta": 0.07853637955132664,
+      "held_out_noise_regression_folds": 0,
+      "held_out_severe_regression_folds": 0,
+      "held_out_diversity_regression_folds": 4,
+      "mean_held_out_diversity_delta": -0.4444444444444444,
+      "stability_pass": true
+    },
+    "acceptance": {
+      "locked_alpha_preserved": true,
+      "beats_pretrained_hybrid_ndcg": true,
+      "pretrained_hybrid_ndcg": 0.907113,
+      "safety_preserved": true,
+      "stability_gate_passed": true,
+      "frozen_benchmark_ready": true
+    }
   }
 }
