@@ -404,6 +404,27 @@ python scripts/substitutability_benchmark.py metrics \
   --k 10
 ```
 
+
+### Frozen checkpoint: ฝน#1 — schema v3 baseline
+
+After re-reviewing the first 30 candidates under schema v3, the frozen V2.5 top-10 baseline is:
+
+- Useful@10: **8/10 (0.80)**
+- HighUtility@10: **6/10 (0.60)**
+- Noise@10: **2/10 (0.20)**
+- SevereError@10: **2/10 (0.20)**
+- relation diversity among useful top-10: **3**
+- NDCG@10: **0.5893666256**
+- MRR(first utility >= 2): **1.0**
+
+Interpretation:
+- V2.5 candidate retrieval is already strong enough to surface useful writing vocabulary: 80% of visible top-10 received utility >= 1;
+- ordering remains substantially improvable: NDCG@10 ~= 0.589 despite a high first result;
+- 20% visible noise/severe-error rate is too high for the final product;
+- this supports keeping V2.5 as retrieval while learning a writer-utility reranking layer rather than replacing retrieval.
+
+This query is now a checkpoint, not a tuning target. Do not tune thresholds or model architecture only against ฝน#1.
+
 ## Phase 2 — Human-rated writer-relevance dataset
 
 After the revised annotation schema is ready:
