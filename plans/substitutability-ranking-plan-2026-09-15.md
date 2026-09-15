@@ -1,7 +1,7 @@
 # Thai Words — Writer Lexical Relevance & Utility Ranking Plan
 
 Date: 2026-09-15  
-Status: **In progress — Phase 3 candidate locked; validation reproduced; checkpoint artifact persistence fix pending**  
+Status: **In progress — Phase 3 candidate locked; checkpoint verified; frozen benchmark ready**  
 Baseline: `feat/dictionary-semantic-v2-5-embeddinggemma`  
 Working branch: `feat/dictionary-substitutability-benchmark`
 
@@ -1256,3 +1256,44 @@ Fix:
 The previous validation/stability reproduction remains valid evidence for the locked configuration, but `frozen_benchmark_ready` is temporarily reset to false until the same locked training command is rerun after this persistence fix and the saved directory is verified.
 
 Do not alter the locked model configuration or alpha during this rerun.
+
+
+### Verified persisted checkpoint — final pre-benchmark gate
+
+The explicit `save_pretrained` rerun completed successfully and the locked model artifact is now physically present at:
+
+- `artifacts/phase3/bge-reranker-v2-m3-locked`
+- `model_checkpoint_saved: true`
+- persisted files include `config.json`, `model.safetensors`, tokenizer/config files, and Sentence Transformers metadata.
+
+The persisted checkpoint's neural-only validation NDCG is **0.902097**.
+
+Using the already locked alpha **0.5**, the persisted-checkpoint hybrid validation result is:
+
+- Useful@10: **0.988889**
+- HighUtility@10: **0.966667**
+- Noise@10: **0.011111**
+- SevereError@10: **0.011111**
+- relation diversity: **2.555556**
+- NDCG@10: **0.921145**
+- MRR high utility: **1.000000**
+
+This is above both the learned baseline (**0.889148**) and the pretrained-BGE hybrid incumbent (**0.907113**) on validation NDCG while preserving the locked alpha and safety profile.
+
+Persisted-checkpoint leave-one-query-out stability:
+
+- alpha **0.5 selected in 9/9 folds**
+- held-out NDCG: **5 wins / 3 ties / 1 loss**
+- mean held-out NDCG delta: **+0.031996**
+- min / max held-out NDCG delta: **-0.081425 / +0.112721**
+- Noise regressions: **0/9**
+- SevereError regressions: **0/9**
+- diversity regressions: **4/9**
+- mean held-out diversity delta: **-0.555556**
+- stability gate: **PASS**
+
+The main known validation failure case remains `ห้อง#1`, where the locked hybrid loses NDCG relative to the learned baseline. This is recorded as diagnostic evidence only and does not change the locked configuration.
+
+Decision:
+
+> Artifact persistence is verified. The Phase 3 candidate remains **fine-tuned BGE + learned baseline, alpha=0.5**. The frozen benchmark is now ready for its single intended evaluation. No further validation-driven tuning is allowed before running it.

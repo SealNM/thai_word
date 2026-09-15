@@ -68,34 +68,37 @@
     "report_v25_learned_neural_and_locked_hybrid": true
   },
   "reproducibility_checkpoint": {
-    "status": "validation_reproduced_checkpoint_artifact_pending",
+    "status": "accepted_artifact_verified",
     "saved_model_path": "artifacts/phase3/bge-reranker-v2-m3-locked",
+    "artifact_verified": true,
     "validation": {
-      "useful_rate_at_k_mean": 0.9888888888888889,
-      "high_utility_rate_at_k_mean": 0.9777777777777779,
-      "noise_rate_at_k_mean": 0.011111111111111112,
-      "severe_error_rate_at_k_mean": 0.011111111111111112,
-      "relation_diversity_at_k_mean": 2.5555555555555554,
-      "ndcg_at_k_mean": 0.9138710114080071,
-      "mrr_high_utility_mean": 1,
-      "selected_alpha": 0.5
+      "neural_only_ndcg_at_k_mean": 0.9020966594754177,
+      "hybrid": {
+        "useful_rate_at_k_mean": 0.9888888888888889,
+        "high_utility_rate_at_k_mean": 0.9666666666666666,
+        "noise_rate_at_k_mean": 0.011111111111111112,
+        "severe_error_rate_at_k_mean": 0.011111111111111112,
+        "relation_diversity_at_k_mean": 2.5555555555555554,
+        "ndcg_at_k_mean": 0.9211445825283222,
+        "mrr_high_utility_mean": 1,
+        "selected_alpha": 0.5
+      }
     },
     "stability": {
       "positive_alpha_folds": 9,
       "alpha_selection_counts": {
-        "0.3": 1,
-        "0.5": 8
+        "0.5": 9
       },
       "held_out_ndcg_wins": 5,
       "held_out_ndcg_ties": 3,
       "held_out_ndcg_losses": 1,
-      "mean_held_out_ndcg_delta": 0.019126395631926394,
-      "min_held_out_ndcg_delta": -0.091648441894985,
-      "max_held_out_ndcg_delta": 0.07853637955132664,
+      "mean_held_out_ndcg_delta": 0.031996246300119706,
+      "min_held_out_ndcg_delta": -0.08142503958931258,
+      "max_held_out_ndcg_delta": 0.11272097962632266,
       "held_out_noise_regression_folds": 0,
       "held_out_severe_regression_folds": 0,
       "held_out_diversity_regression_folds": 4,
-      "mean_held_out_diversity_delta": -0.4444444444444444,
+      "mean_held_out_diversity_delta": -0.5555555555555556,
       "stability_pass": true
     },
     "acceptance": {
@@ -104,9 +107,9 @@
       "pretrained_hybrid_ndcg": 0.907113,
       "safety_preserved": true,
       "stability_gate_passed": true,
-      "frozen_benchmark_ready": false,
-      "reason": "Validation/stability reproduction passed, but the legacy CrossEncoder.fit path did not persist --model-output. Re-run the same locked config after the explicit save_pretrained fix, then verify the saved directory before frozen benchmark evaluation."
-    },
-    "artifact_verified": false
+      "checkpoint_directory_verified": true,
+      "model_checkpoint_saved": true,
+      "frozen_benchmark_ready": true
+    }
   }
 }
