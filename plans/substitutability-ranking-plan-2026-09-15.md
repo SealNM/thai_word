@@ -1,7 +1,7 @@
 # Thai Words — Writer Lexical Relevance & Utility Ranking Plan
 
 Date: 2026-09-15  
-Status: **In progress — product objective refined after Phase 1 pilot**  
+Status: **In progress — schema v3 approved after first 30 human labels**  
 Baseline: `feat/dictionary-semantic-v2-5-embeddinggemma`  
 Working branch: `feat/dictionary-substitutability-benchmark`
 
@@ -96,15 +96,17 @@ top-N candidate senses
 Writer Relevance / Relation Classifier
         |
         +--> direct
-        +--> near_synonym / register
         +--> subtype
+        +--> broader_concept
         +--> manner_action
         +--> scene_context
         +--> effect_state
-        +--> literary_imagery
         +--> weak_related
         +--> opposite / misleading
-        +--> unrelated / noise
+        +--> sense mismatch
+        +--> unrelated / unclear
+        |
+        +--> independent style/register tags
         |
         v
 Writer Utility score/class
@@ -127,7 +129,11 @@ It should not reduce the problem to:
 
 ## Human annotation contract — revised objective
 
-Each target-sense / candidate-sense pair should receive at least two labels.
+Each target-sense / candidate-sense pair should receive three independent annotation axes:
+
+1. writer utility;
+2. semantic relation;
+3. style/register tags.
 
 ### Writer utility
 
@@ -142,21 +148,35 @@ Utility is the main product label.
 
 The relation taxonomy should support useful non-synonym vocabulary.
 
-Initial target classes:
+Schema v3 semantic classes:
 
 - `direct` — direct lexical alternative / synonym
-- `near_register` — near-synonym, register/style/literary shift
 - `subtype` — narrower type or specific form of the concept
+- `broader_concept` — a broader concept that contains the query concept
 - `manner_action` — action/manner commonly used to describe the concept
-- `scene_context` — surrounding scene, imagery, or context useful for description
+- `scene_context` — surrounding scene or context useful for description
 - `effect_state` — state/effect/consequence useful for description
-- `literary_imagery` — strongly literary/figurative/image-rich relation when useful to distinguish
 - `weak_related` — genuinely related but low writer utility
-- `opposite_misleading` — contradiction/antonym or likely to mislead the writer
+- `opposite_misleading` — contradiction/antonym or likely to mislead
+- `sense_mismatch` — wrong dictionary sense / homonym leakage
 - `unrelated` — unrelated/noise
 - `unclear` — cannot judge confidently
 
-The taxonomy may be simplified after observing the first human-rated dataset; do not overfit categories before enough examples exist.
+Style/register is a separate multi-label axis:
+
+- `literary`
+- `archaic`
+- `formal`
+- `colloquial`
+- `technical`
+- `dialect`
+- `figurative`
+- `other`
+- `unknown`
+
+An empty style-tag list means unmarked/general language.
+
+This separation is deliberate: words such as `พรรษ` can be semantically `direct` while stylistically `literary`, and `โบกขรพรรษ` can be a `subtype` while also carrying literary/archaic style tags.
 
 ### Important annotation rules
 
@@ -168,7 +188,10 @@ The taxonomy may be simplified after observing the first human-rated dataset; do
 - A subtype such as `ฝนซู่` should generally rank below a very strong direct alternative, but it is not a negative.
 - A rare/literary word is not negative merely because it is uncommon.
 - Annotators judge usefulness for writing around the selected query sense, not synonym equivalence alone.
-- Utility and relation are related but independent: relation describes **how** the words connect; utility describes **how useful** that connection is to the writer.
+- Utility, semantic relation, and style/register are independent axes.
+- Semantic relation describes **how concepts connect**, not whether the result is good or bad.
+- Utility describes **how useful** the candidate is to the writer.
+- Style/register describes linguistic flavor and must not be encoded inside semantic relation.
 
 ## Phase 1 — Benchmark plumbing
 
@@ -234,9 +257,9 @@ The interactive annotator:
 
 Use per-query annotation first so the label policy can be reviewed after each 30-candidate block before scaling to the full benchmark.
 
-The schema has now been revised to Writer Relevance schema v2. Re-export the unlabeled pilot after pulling the latest branch before human labeling, because the first 300-row export used schema v1.
+Historical note: the schema was first revised to Writer Relevance schema v2. Re-export the unlabeled pilot after pulling the latest branch before human labeling, because the first 300-row export used schema v1.
 
-### Writer Relevance schema v2 status
+### Historical schema v2 status — superseded by v3
 
 Implemented in `thai_substitutability.py`:
 - `SCHEMA_VERSION = 2`;
@@ -256,7 +279,7 @@ Revised baseline metrics:
 
 The initial Colab file `evaluation/substitutability_annotations.jsonl` was exported before schema v2. It is unlabeled, so do not migrate it manually; pull the branch and re-run the export command to regenerate the same 300 V2.5 pairs with schema v2.
 
-Schema v2 test coverage now contains 9 cases covering:
+Historical schema v2 test coverage contained 9 cases covering:
 - deterministic sense-pair IDs;
 - useful cross-role `manner_action`;
 - useful `scene_context`;
@@ -285,6 +308,90 @@ python scripts/substitutability_benchmark.py export \
 python scripts/substitutability_benchmark.py validate \
   evaluation/substitutability_annotations.jsonl \
   --allow-unlabeled
+```
+
+
+### First human-label checkpoint — ฝน#1 (30 candidates)
+
+The first complete human annotation block produced:
+
+- utility 0: 11
+- utility 1: 8
+- utility 2: 5
+- utility 3: 6
+
+The utility scale behaved usefully, but the v2 relation taxonomy mixed semantic relation with style/register. Concrete examples:
+
+- `ฝนซู่`, `ฝนไล่ช้าง`, `ฝนห่าแก้ว`, `ฝนสั่งฟ้า`, `ฝนหลวง` are fundamentally `subtype`, even when their writer utility differs;
+- `พยับเมฆ` and `เมฆ` are better modeled as `scene_context`, not register/literary semantic relations;
+- `เละ`, `น้ำป่า`, `เปียก` can be `effect_state` even when utility is 0;
+- `ตก` and `ลง` can be `manner_action` even when the annotator does not consider them useful results;
+- `หยาดน้ำฟ้า` motivates `broader_concept`;
+- `พรรษ` shows why direct semantic relation and literary register must be separate.
+
+Decision: **schema v2 is superseded by schema v3 before annotating the remaining pilot rows.**
+
+### Writer Relevance schema v3
+
+Schema v3 fields:
+
+```json
+{
+  "utility": 0,
+  "semantic_relation": "subtype",
+  "style_tags": ["literary", "archaic"],
+  "legacy_relation": "manner_action",
+  "notes": ""
+}
+```
+
+Rules:
+
+- `utility` remains ordinal `0..3`;
+- `semantic_relation` uses the semantic-only taxonomy above;
+- `style_tags` is multi-label; `[]` means unmarked/general language;
+- `legacy_relation` exists only to preserve v2 annotation history and is not training truth;
+- severe semantic errors (`opposite_misleading`, `sense_mismatch`, `unrelated`) require utility 0;
+- other semantic relations do **not** imply any fixed utility.
+
+Migration policy:
+
+- preserve all existing writer-utility labels;
+- never auto-convert v2 relation labels into v3 semantic truth;
+- store the old relation under `legacy_relation`;
+- re-review only semantic relation + style for already utility-labeled rows.
+
+Migration command:
+
+```bash
+python scripts/substitutability_benchmark.py migrate-v3 \
+  evaluation/substitutability_annotations.jsonl \
+  --output evaluation/substitutability_annotations.v3.jsonl
+```
+
+Then validate partial v3 data:
+
+```bash
+python scripts/substitutability_benchmark.py validate \
+  evaluation/substitutability_annotations.v3.jsonl \
+  --allow-unlabeled
+```
+
+Re-review the 30 `ฝน` rows. Existing utility values are preserved automatically:
+
+```bash
+python scripts/substitutability_benchmark.py annotate \
+  evaluation/substitutability_annotations.v3.jsonl \
+  --query ฝน
+```
+
+After all 30 rows are complete under v3, measure only that query even though the rest of the pilot is still unlabeled:
+
+```bash
+python scripts/substitutability_benchmark.py metrics \
+  evaluation/substitutability_annotations.v3.jsonl \
+  --query ฝน \
+  --k 10
 ```
 
 ## Phase 2 — Human-rated writer-relevance dataset
