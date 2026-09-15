@@ -923,3 +923,75 @@ Decision rule before fine-tuning:
 4. require a real validation NDCG improvement over alpha=0 before treating the neural signal as additive;
 5. if no hybrid alpha improves the learned baseline, do not fine-tune this model merely to chase the nine validation queries;
 6. keep the frozen benchmark closed until a candidate architecture is selected from train/validation evidence.
+
+
+### Phase 3 hybrid stability checkpoint
+
+A leave-one-query-out stability analyzer is implemented in `scripts/writer_relevance_phase3_hybrid_stability.py`.
+
+It consumes the already-generated hybrid report, so no model reload, GPU, annotation file, or neural rescoring is required. The analyzer:
+
+- reconstructs mean metrics from the stored per-query metrics for every alpha;
+- leaves out one validation query at a time;
+- selects alpha from the remaining eight queries using the same NDCG + Noise/SevereError rule as the hybrid harness;
+- evaluates that selected alpha only on the held-out query;
+- reports per-query NDCG / safety / diversity deltas;
+- refuses reports that evaluated benchmark rows or used benchmark rows for alpha selection.
+
+Predeclared stability gate:
+
+1. positive neural weight must be selected in at least two-thirds of leave-one-query-out folds;
+2. mean held-out NDCG delta must be positive;
+3. held-out NDCG wins must be at least as numerous as losses;
+4. there must be zero held-out Noise@10 regressions;
+5. there must be zero held-out SevereError@10 regressions;
+6. relation diversity is reported diagnostically but does not gate the pass yet.
+
+Observed BGE hybrid stability result from the validation report:
+
+- source model: `BAAI/bge-reranker-v2-m3`;
+- validation queries: **9**;
+- full-validation selected alpha: **0.4**;
+- leave-one-query-out alpha selection: **0.4 in 8/9 folds**, **0.2 in 1/9 fold**;
+- positive-alpha folds: **9/9**;
+- held-out NDCG: **5 wins / 3 ties / 1 loss**;
+- mean held-out NDCG delta: **+0.007288**;
+- min held-out NDCG delta: **-0.051552**;
+- max held-out NDCG delta: **+0.044799**;
+- held-out Noise regressions: **0/9**;
+- held-out SevereError regressions: **0/9**;
+- diversity regressions: **4/9**;
+- mean held-out diversity delta: **-0.444444**;
+- stability gate: **PASS**.
+
+Held-out failure / diagnostic cases:
+
+- `ห้อง#1` is the only NDCG loss at the alpha selected from the other eight queries: delta **-0.051552**, with relation diversity delta **-2**;
+- `ประตู#1` improves NDCG but loses relation diversity by **2**;
+- `หอม#5` improves NDCG but loses relation diversity by **1**;
+- `เปียก#1` ties on NDCG but loses relation diversity by **1**.
+
+Interpretation:
+
+- the BGE signal is not dependent on one validation query; the selected weight remains highly stable under leave-one-query-out analysis;
+- safety behavior generalizes across all nine held-out folds;
+- the architecture is therefore promoted from an exploratory blend to the current Phase 3 candidate architecture;
+- relation-diversity collapse remains the primary unresolved trade-off and must be monitored in the next challenger;
+- the frozen benchmark remains closed.
+
+Run the stability analyzer on Kaggle/locally from the existing hybrid report:
+
+```bash
+python -m scripts.writer_relevance_phase3_hybrid_stability \
+  --hybrid-report evaluation/writer_relevance_phase3_bge_v2_m3_hybrid_report.json \
+  --output evaluation/writer_relevance_phase3_bge_v2_m3_stability_report.json
+```
+
+Next challenger before opening the frozen benchmark:
+
+1. fine-tune `BAAI/bge-reranker-v2-m3` on the 31-query train split only;
+2. generate validation-only scores;
+3. run the same hybrid alpha grid and stability analyzer;
+4. compare pretrained-BGE hybrid vs fine-tuned-BGE hybrid on validation and stability;
+5. require no safety regression and explicitly inspect relation diversity, especially `ห้อง#1`;
+6. select one architecture/hyperparameter configuration before the single frozen-benchmark evaluation.
