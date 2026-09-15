@@ -12,6 +12,7 @@ import numpy as np
 from scripts.writer_relevance_phase3_crossencoder import (
     _configure_cuda_visibility,
     _delta_summary,
+    _save_model_checkpoint,
     _write_score_output,
     text_pair,
     utility_target,
@@ -73,6 +74,19 @@ class FakeModel:
 
 
 class WriterRelevancePhase3CrossEncoderTests(unittest.TestCase):
+    def test_explicit_checkpoint_save_writes_files(self) -> None:
+        class SaveModel:
+            def save_pretrained(self, path: str) -> None:
+                target = Path(path)
+                target.mkdir(parents=True, exist_ok=True)
+                (target / "config.json").write_text("{}", encoding="utf-8")
+
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "saved-model"
+            saved = _save_model_checkpoint(SaveModel(), output)
+            self.assertEqual(saved, str(output))
+            self.assertTrue((output / "config.json").exists())
+
     def test_cuda_visibility_can_isolate_single_gpu_before_torch_import(self) -> None:
         with patch.dict("os.environ", {}, clear=False):
             self.assertEqual(_configure_cuda_visibility("0"), "0")

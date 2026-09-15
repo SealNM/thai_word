@@ -68,7 +68,7 @@
     "report_v25_learned_neural_and_locked_hybrid": true
   },
   "reproducibility_checkpoint": {
-    "status": "accepted",
+    "status": "validation_reproduced_checkpoint_artifact_pending",
     "saved_model_path": "artifacts/phase3/bge-reranker-v2-m3-locked",
     "validation": {
       "useful_rate_at_k_mean": 0.9888888888888889,
@@ -104,7 +104,9 @@
       "pretrained_hybrid_ndcg": 0.907113,
       "safety_preserved": true,
       "stability_gate_passed": true,
-      "frozen_benchmark_ready": true
-    }
+      "frozen_benchmark_ready": false,
+      "reason": "Validation/stability reproduction passed, but the legacy CrossEncoder.fit path did not persist --model-output. Re-run the same locked config after the explicit save_pretrained fix, then verify the saved directory before frozen benchmark evaluation."
+    },
+    "artifact_verified": false
   }
 }

@@ -1,7 +1,7 @@
 # Thai Words — Writer Lexical Relevance & Utility Ranking Plan
 
 Date: 2026-09-15  
-Status: **In progress — Phase 3 candidate locked and reproduced; frozen benchmark ready**  
+Status: **In progress — Phase 3 candidate locked; validation reproduced; checkpoint artifact persistence fix pending**  
 Baseline: `feat/dictionary-semantic-v2-5-embeddinggemma`  
 Working branch: `feat/dictionary-substitutability-benchmark`
 
@@ -1229,3 +1229,30 @@ python -m scripts.writer_relevance_phase3_frozen_benchmark \
 ```
 
 Once this command has been run, treat the benchmark as opened. Record the result, but do not use it to change alpha, model architecture, learning rate, epoch count, or other Phase 3 selection choices.
+
+
+### Checkpoint persistence incident before frozen benchmark
+
+The first frozen-benchmark command failed before model prediction because the expected saved model directory did not exist:
+
+```text
+FileNotFoundError: Saved fine-tuned model not found:
+artifacts/phase3/bge-reranker-v2-m3-locked
+```
+
+Root cause:
+
+- the legacy `CrossEncoder.fit(..., output_path=..., save_best_model=False)` path used by the harness did not reliably persist the final model in the installed Sentence Transformers version;
+- validation and stability reproduction had succeeded, but the intended checkpoint artifact was therefore absent;
+- no frozen-benchmark model prediction or benchmark metric report was produced by the failed command.
+
+Fix:
+
+- training now calls `CrossEncoder.save_pretrained(model_output)` explicitly after `fit()`;
+- the save helper verifies that the output directory contains files and raises immediately otherwise;
+- validation reports now expose `model_checkpoint_output` and `model_checkpoint_saved`;
+- the frozen-benchmark harness now loads/verifies the saved checkpoint **before reading the frozen dataset**, so future missing/corrupt checkpoint failures do not touch benchmark rows.
+
+The previous validation/stability reproduction remains valid evidence for the locked configuration, but `frozen_benchmark_ready` is temporarily reset to false until the same locked training command is rerun after this persistence fix and the saved directory is verified.
+
+Do not alter the locked model configuration or alpha during this rerun.

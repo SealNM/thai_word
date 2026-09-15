@@ -6,6 +6,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import numpy as np
 
@@ -145,6 +146,45 @@ class WriterRelevancePhase3FrozenBenchmarkTests(unittest.TestCase):
         args = SimpleNamespace(confirm_frozen_benchmark=False)
         with self.assertRaises(ValueError):
             run(args)
+
+    def test_missing_model_fails_before_frozen_dataset_is_read(self) -> None:
+        manifest = {
+            "status": "locked_before_frozen_benchmark",
+            "hybrid": {
+                "alpha": 0.5,
+                "alpha_must_not_be_reselected_on_benchmark": True,
+            },
+            "benchmark_policy": {
+                "no_hyperparameter_changes_after_opening": True,
+                "no_alpha_search": True,
+                "no_model_selection": True,
+            },
+            "neural_model": {"max_length": 384},
+        }
+        split_manifest = {"splits": {}}
+
+        with tempfile.TemporaryDirectory() as directory:
+            directory_path = Path(directory)
+            manifest_path = directory_path / "candidate.json"
+            split_path = directory_path / "split.json"
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            split_path.write_text(json.dumps(split_manifest), encoding="utf-8")
+
+            args = SimpleNamespace(
+                confirm_frozen_benchmark=True,
+                candidate_manifest=str(manifest_path),
+                split_manifest=str(split_path),
+                model_path=str(directory_path / "missing-model"),
+                input=str(directory_path / "should-not-be-read.jsonl"),
+                device="cpu",
+            )
+            with patch(
+                "scripts.writer_relevance_phase3_frozen_benchmark.read_jsonl"
+            ) as read_mock:
+                with self.assertRaises(FileNotFoundError):
+                    run(args)
+
+            read_mock.assert_not_called()
 
 
 if __name__ == "__main__":

@@ -107,6 +107,19 @@ def _load_model(args: argparse.Namespace) -> Any:
     )
 
 
+def _save_model_checkpoint(model: Any, path: str | Path) -> str:
+    output = Path(path)
+    output.mkdir(parents=True, exist_ok=True)
+    model.save_pretrained(str(output))
+
+    files = [item for item in output.rglob("*") if item.is_file()]
+    if not files:
+        raise RuntimeError(
+            f"CrossEncoder.save_pretrained produced no files in {output}."
+        )
+    return str(output)
+
+
 def _fit_model(train: list[dict[str, Any]], args: argparse.Namespace) -> tuple[Any, int]:
     from sentence_transformers import InputExample
     from torch.utils.data import DataLoader
@@ -139,11 +152,13 @@ def _fit_model(train: list[dict[str, Any]], args: argparse.Namespace) -> tuple[A
         epochs=args.epochs,
         warmup_steps=warmup_steps,
         optimizer_params={"lr": args.learning_rate},
-        output_path=str(args.model_output) if args.model_output else None,
+        output_path=None,
         save_best_model=False,
         use_amp=bool(getattr(args, "use_amp", False)),
         show_progress_bar=not args.no_progress,
     )
+    if args.model_output:
+        _save_model_checkpoint(model, args.model_output)
     return model, warmup_steps
 
 
@@ -268,6 +283,15 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "max_length": args.max_length,
         "seed": args.seed,
         "validation_score_output": str(score_output) if score_output else None,
+        "model_checkpoint_output": (
+            str(args.model_output) if (not no_finetune and args.model_output) else None
+        ),
+        "model_checkpoint_saved": bool(
+            not no_finetune
+            and args.model_output
+            and Path(args.model_output).exists()
+            and any(Path(args.model_output).rglob("*"))
+        ),
         "baseline_v25": baseline_summary,
         "cross_encoder_utility": candidate_summary,
         "delta_vs_v25": _delta_summary(candidate_summary, baseline_summary),

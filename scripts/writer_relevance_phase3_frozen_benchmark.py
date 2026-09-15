@@ -138,6 +138,15 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     split_manifest = _load_json(args.split_manifest)
     _validate_locked_manifest(manifest)
 
+    # Infrastructure/artifact checks happen before the frozen dataset is read.
+    # A missing or unreadable model must fail without touching benchmark rows.
+    neural_cfg = manifest["neural_model"]
+    model = _load_saved_crossencoder(
+        args.model_path,
+        max_length=int(neural_cfg["max_length"]),
+        device=args.device,
+    )
+
     rows = read_jsonl(args.input)
     _validate_dataset_against_freeze(
         rows,
@@ -161,13 +170,6 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         benchmark,
         seed=int(learned_cfg["seed"]),
         severe_penalty=float(learned_cfg["severe_penalty"]),
-    )
-
-    neural_cfg = manifest["neural_model"]
-    model = _load_saved_crossencoder(
-        args.model_path,
-        max_length=int(neural_cfg["max_length"]),
-        device=args.device,
     )
     predict_args = SimpleNamespace(
         eval_batch_size=int(neural_cfg["eval_batch_size"]),
