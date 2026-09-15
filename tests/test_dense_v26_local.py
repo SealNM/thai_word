@@ -54,6 +54,10 @@ class DenseV26LocalEmbeddingTests(unittest.TestCase):
         self.assertEqual(profile["truncate_dim"], 256)
         self.assertEqual(profile["query_prefix"], "query: ")
         self.assertEqual(profile["document_prefix"], "")
+        self.assertEqual(
+            profile["config_kwargs"],
+            {"use_memory_efficient_attention": False},
+        )
 
     def test_local_challenger_documents_have_no_query_prefix(self) -> None:
         model = _FakeEncodeModel()
