@@ -1,0 +1,37 @@
+{
+  "schema_version": 3,
+  "status": "approved_and_frozen",
+  "approved_date": "2026-09-16",
+  "policy": {
+    "pilot_usage": "The 10 pilot targets were used during schema/objective design, so they are assigned to train/development and never to the final frozen benchmark.",
+    "split_unit": "target sense / concept family; never random candidate pairs"
+  },
+  "splits": {
+    "train": {
+      "query_count": 31,
+      "pair_count": 930,
+      "queries": ["กระซิบ#1","กระโดด#1","กลัว#1","คลาน#1","งาม#1","ช้า#1","ดีใจ#1","ตอบ#1","ตะโกน#1","ถาม#1","บ้าน#1","ป่า#1","พูด#1","ฝน#1","ฟ้า#1","มืด#1","รัก#3","ลม#3","วิ่ง#1","สว่าง#1","สวย#1","หมอก#1","อาย#1","เกลียด#1","เดิน#1","เมฆ#1","เรียก#1","เร็ว#1","เศร้า#1","เหงา#1","แสง#1"]
+    },
+    "validation": {
+      "query_count": 9,
+      "pair_count": 270,
+      "queries": ["ถนน#1","นุ่ม#1","ประตู#1","หอม#5","ห้อง#1","เปียก#1","เมือง#4","แข็ง#2","ป่า#1"]
+    },
+    "benchmark": {
+      "query_count": 10,
+      "pair_count": 300,
+      "queries": ["นั่ง#1","ยืน#1","ร้อน#1","เย็น#2","หนาว#1","มอง#1","ยิ้ม#1","ร้องไห้#1","หัวเราะ#1","ฝัน#2"]
+    }
+  },
+  "files": {
+    "phase2_approved": {
+      "name": "writer_relevance_phase2_annotations.approved.jsonl",
+      "rows": 1200
+    },
+    "combined_50_approved": {
+      "name": "writer_relevance_50_annotations.approved.jsonl",
+      "rows": 1500,
+      "sha256": "6e767583302a6df75c9b76d86fc73cbda150c98fbbe7c95b912a650a04a1a515"
+    }
+  }
+}
