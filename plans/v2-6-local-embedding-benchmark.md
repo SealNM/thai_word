@@ -224,3 +224,16 @@ Observed metadata:
 - documents remain unprefixed
 
 Relative to the fresh V2.5 EmbeddingGemma baseline, Qwen3 encoding is about 5.1x slower on the same T4 (1,326.543s vs 259.965s). Quality must therefore improve materially to justify replacing V2.5.
+
+
+## Arctic Colab compatibility note
+
+Initial Arctic load failed on Colab because the model config enables `use_memory_efficient_attention=true`, and its remote GTE implementation asserts that `xformers` must be installed when that path is enabled.
+
+For the benchmark we do not install `xformers`. The Arctic profile now passes:
+
+```python
+config_kwargs={"use_memory_efficient_attention": False}
+```
+
+to Sentence Transformers. This uses the model's standard attention path and avoids an unnecessary optional dependency on Colab. The semantic model weights, 256d Matryoshka truncation, query prefix, and document formatting are unchanged.
