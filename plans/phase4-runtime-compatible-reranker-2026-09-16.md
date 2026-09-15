@@ -1,7 +1,7 @@
 # Thai Words — Phase 4 Runtime-Compatible Writer Reranker Plan
 
 Date: 2026-09-16  
-Status: **In progress — Wave A category-free contract accepted; Wave B persisted learned scorer implemented**  
+Status: **In progress — Waves A/B complete; Wave C neural runtime wrapper implemented**  
 Base commit: `959c502254529e7260fdbf98a615b0e4e7858145`  
 Working branch: `feat/phase4-runtime-compatible-reranker-2026-09-16`
 
@@ -653,3 +653,69 @@ Next gate:
 2. build the learned artifact;
 3. load it back and score validation rows without fitting;
 4. once the persisted artifact is verified, continue to Wave C neural runtime wrapper.
+
+
+## Wave C implementation checkpoint — neural runtime wrapper
+
+Implemented:
+
+- `thai_writer_neural.py`
+  - `NeuralWriterRanker` with lazy CrossEncoder loading;
+  - explicit local checkpoint path or `THAI_WORD_WRITER_RERANKER_MODEL_PATH`;
+  - runtime download disabled by default;
+  - optional `allow_download=True` only for deliberate development use;
+  - CPU/CUDA device pass-through;
+  - configurable max length and batch size;
+  - category-free neural input via the shared Wave A runtime contract;
+  - finite-score/count validation;
+  - `warmup()` method;
+  - runtime metadata including resolved source, actual/requested device, and model load seconds.
+
+- `tests/test_writer_neural_ranker.py`
+  - verifies true lazy loading;
+  - environment variable model-path fallback;
+  - missing checkpoint does not silently download;
+  - explicit download opt-in;
+  - category is omitted from runtime neural text;
+  - warmup path;
+  - empty input never loads the model.
+
+Production behavior:
+
+```text
+explicit model_path
+    ↓
+THAI_WORD_WRITER_RERANKER_MODEL_PATH
+    ↓
+error if no local checkpoint
+```
+
+Normal production inference must not contact Hugging Face automatically.
+
+Recommended verification using the archived Phase 3 checkpoint:
+
+```bash
+python -m unittest discover \
+  -s tests \
+  -p 'test_writer_neural_ranker.py' \
+  -v
+```
+
+Then:
+
+```python
+from thai_writer_neural import NeuralWriterRanker
+
+ranker = NeuralWriterRanker(
+    "artifacts/phase3/bge-reranker-v2-m3-locked",
+    device="cuda",
+    batch_size=4,
+)
+
+print(ranker.runtime_info())  # loaded=false
+print(ranker.warmup())        # loaded=true + load/device metadata
+```
+
+Next implementation wave:
+
+> Wave D — combine V2.5, persisted learned scorer, and lazy neural scorer into `WriterSearch` with fixed alpha 0.5 and a strict top-30 candidate boundary.
