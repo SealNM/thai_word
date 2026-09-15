@@ -1,6 +1,6 @@
 # V2.6 — Local Multilingual Embedding Benchmark
 
-Status: **all three 256d indexes built successfully; shared 10-query benchmark pending**
+Status: **10-query pilot complete; keep V2.5 EmbeddingGemma as retrieval baseline**
 
 Branch: `feat/dictionary-semantic-v26-local-embedding-benchmark`
 
@@ -53,7 +53,7 @@ Model:
 - `Snowflake/snowflake-arctic-embed-l-v2.0`
 - Apache-2.0
 - multilingual model with Thai explicitly covered in its language set
-- native 768d
+- native 1024d
 - official Matryoshka 256d representation
 
 Official retrieval format:
@@ -77,11 +77,11 @@ The first benchmark uses the official 256d Matryoshka representation.
 - [x] Run local profile tests.
 - [x] Build Qwen3 256d index.
 - [x] Build Arctic-L 256d index.
-- [ ] Run shared 10-query evaluation against V2.5.
-- [ ] Inspect V3 holdout only after the 10-query pilot.
-- [ ] Record build time, model load time, and query latency.
+- [x] Run shared 10-query evaluation against V2.5.
+- [ ] V3 holdout deferred: no challenger won the 10-query pilot materially.
+- [x] Record build time; query-ranking pilot completed. CPU query latency may be recorded separately if needed.
 - [ ] If Arctic-L 256d wins materially, optionally compare its native 768d representation.
-- [ ] If neither challenger beats V2.5, keep EmbeddingGemma and return focus to Gemma 4 reranking.
+- [x] Neither challenger beats V2.5 consistently; keep EmbeddingGemma and return focus to ranking/reranking.
 
 ## Artifact paths
 
@@ -103,7 +103,7 @@ python -m unittest discover -s tests -p "test_dense_v26_local.py" -v
 python -u scripts/build_dense_index.py \
   --model qwen3-embedding-0.6b-256 \
   --output artifacts/v26/qwen3-embedding-0.6b-256 \
-  --batch-size 32 \
+  --batch-size 8 \
   --device cuda
 ```
 
@@ -302,3 +302,52 @@ Relative build speed on the same Colab T4:
 - Qwen3: 1,326.543s (~5.10x slower than V2.5)
 
 Arctic-L is therefore ~2.75x faster to encode than Qwen3 in this setup while producing the same 256d artifact size. Retrieval quality remains the deciding factor.
+
+
+## 10-query pilot result and decision
+
+The shared hybrid benchmark compared:
+- V2.5 `embeddinggemma-300m-256`
+- V2.6 `qwen3-embedding-0.6b-256`
+- V2.6 `arctic-embed-l-v2-256`
+
+All runs used the same V1 lexical index, selected query senses, 300-entry lexical/dense candidate pools, weighted RRF, and protected lexical-tier sort. Only the dense embedding model changed.
+
+### Qualitative result by query
+
+| Query | Best / notable result | Notes |
+| --- | --- | --- |
+| ฝน | EmbeddingGemma ≈ Qwen3 | Both keep core rain terms high; Arctic-L drifts toward rarer `วัสนะ / พรรษ / เผลียง`. |
+| โกรธ | EmbeddingGemma | Puts common `โมโห` first; challengers do not add a clear quality gain. |
+| เดิน | Arctic-L | Stronger walking-specific tail (`เดินเหิน / คลาไคล`), although V2.5 remains competitive. |
+| สวย | Qwen3 / Arctic-L | `งดงาม` rises to #4 vs #8 in V2.5, but none surfaces the desired common `งาม` in top 10. |
+| มืด | Arctic-L slight | `มืดมน` enters top 10; otherwise all three remain dominated by the same lexical tier. |
+| รัก | Arctic-L slight | `รักใคร่ / จงรัก / ผูกพัน` are useful, but the tail still contains weak items. Qwen3 introduces noun/associated forms such as `ที่รัก / ดวงใจ`. |
+| พูด | EmbeddingGemma | Most natural/common substitutes overall (`จา / เว้า / เจรจา / กล่าว / ออกปาก`). |
+| เร็ว | Arctic-L | Clear local win: `รวดเร็ว / ฉับไว` rank well. Qwen3 regresses badly with `เข้า / ช้า / หน่อย`. |
+| กลัว | EmbeddingGemma ≈ Qwen3 | No material improvement from switching models. |
+| บ้าน | No model solves the target | All three are still dominated by `ภูม / เวศม์ / นิเวศ / วาสะ...`; none promotes `เรือน / บ้านเรือน / บ้านช่อง` into top 10. |
+
+### Decision
+
+Do **not** replace V2.5 EmbeddingGemma with Qwen3 or Arctic-L.
+
+Reasons:
+1. No challenger wins consistently across the ten Thai dictionary queries.
+2. Qwen3 has several useful local improvements but also explicit semantic regressions (for example `เร็ว → ช้า`) and is ~5.1x slower to build than V2.5 on T4.
+3. Arctic-L is operationally better than Qwen3 and wins some queries (`เดิน`, `เร็ว`), but regresses on others (`ฝน`) and is still ~1.85x slower to build than V2.5.
+4. The most important failure, `บ้าน`, is unchanged by switching embeddings.
+
+### Bottleneck diagnosis
+
+The pilot confirms that the remaining problem is primarily **ranking after candidate retrieval**, not lack of semantic candidates.
+
+`HybridSearcher.search()` builds the candidate set from the union of the top 300 lexical and top 300 dense entries, but final ordering sorts first by `protected_relation_tier`, then weighted-RRF score, lexical score, and dense similarity. A standalone lexical relation with tier >= 4 therefore outranks lower-tier candidates before dense quality is considered.
+
+This explains why replacing only the dense model changes some middle/tail ordering but does not fix high-priority cases such as `บ้าน`. The next iteration should therefore focus on:
+- lexical-validity / grammatical-role gating;
+- commonness after semantic validity;
+- reranking a small candidate pool (Gemma 4 direct remains the strongest tested direction);
+- revisiting protected-tier policy only if it prevents common valid substitutes from surfacing.
+
+V3 holdout is not required for choosing between these three embeddings because neither challenger produced a material pilot win. Keep the artifacts for future ensemble/recall experiments, but preserve V2.5 EmbeddingGemma as the retrieval baseline.
