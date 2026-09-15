@@ -133,6 +133,69 @@ def inspect_targets(args: argparse.Namespace) -> None:
     )
 
 
+def freeze_targets(args: argparse.Namespace) -> None:
+    with Path(args.report).open("r", encoding="utf-8") as handle:
+        report = json.load(handle)
+
+    targets = report.get("targets")
+    if not isinstance(targets, list):
+        raise ValueError("Sense report must contain a 'targets' array.")
+
+    frozen_queries: list[dict[str, Any]] = []
+    errors: list[str] = []
+
+    for target in targets:
+        query = str(target.get("query", "")).strip()
+        selected = target.get("recommended_sense")
+        senses = target.get("senses")
+
+        if not query:
+            errors.append("<missing query>: query is required.")
+            continue
+        if not isinstance(senses, list) or not senses:
+            errors.append(f"{query}: no dictionary senses are available.")
+            continue
+        if not isinstance(selected, int):
+            errors.append(
+                f"{query}: recommended_sense must be set to an integer before freezing."
+            )
+            continue
+        if not any(int(item.get("sense", -1)) == selected for item in senses):
+            errors.append(
+                f"{query}: recommended_sense={selected} does not exist in the sense report."
+            )
+            continue
+
+        frozen_queries.append(
+            {
+                "query": query,
+                "sense": selected,
+                "category": target.get("category"),
+                "intended": target.get("intended"),
+            }
+        )
+
+    if errors:
+        for error in errors:
+            print(f"ERROR: {error}", file=sys.stderr)
+        raise SystemExit(1)
+
+    frozen = {
+        "description": (
+            "Frozen Phase-2 writer relevance targets. Sense IDs were verified "
+            "against the V2.5 lexical artifact before candidate export."
+        ),
+        "queries": frozen_queries,
+    }
+    output = Path(args.output)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    output.write_text(
+        json.dumps(frozen, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    print(f"Frozen {len(frozen_queries)} target senses to {output}")
+
+
 def export_candidates(args: argparse.Namespace) -> None:
     if args.candidates < 1:
         raise ValueError("--candidates must be at least 1.")
@@ -684,6 +747,20 @@ def build_parser() -> argparse.ArgumentParser:
         default="evaluation/writer_relevance_phase2_sense_report.json",
     )
     inspect.set_defaults(func=inspect_targets)
+
+    freeze = subparsers.add_parser(
+        "freeze-targets",
+        help="Freeze a reviewed sense report into an explicit benchmark config.",
+    )
+    freeze.add_argument(
+        "--report",
+        default="evaluation/writer_relevance_phase2_sense_report.json",
+    )
+    freeze.add_argument(
+        "--output",
+        default="evaluation/writer_relevance_phase2_frozen_queries.json",
+    )
+    freeze.set_defaults(func=freeze_targets)
 
     export = subparsers.add_parser(
         "export",
