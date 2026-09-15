@@ -1,0 +1,245 @@
+{
+  "description": "Phase-2 expansion pool: 40 additional writer-oriented targets to bring the benchmark from 10 pilot target senses toward at least 50 total. Sense IDs are intentionally unresolved until inspect-targets is run against the frozen V2.5 lexical artifact.",
+  "queries": [
+    {
+      "query": "ลม",
+      "sense": null,
+      "category": "noun:nature",
+      "intended": "กระแสอากาศ / wind"
+    },
+    {
+      "query": "ฟ้า",
+      "sense": null,
+      "category": "noun:nature",
+      "intended": "ท้องฟ้า / sky"
+    },
+    {
+      "query": "เมฆ",
+      "sense": null,
+      "category": "noun:nature",
+      "intended": "เมฆบนท้องฟ้า / cloud"
+    },
+    {
+      "query": "หมอก",
+      "sense": null,
+      "category": "noun:nature",
+      "intended": "ละอองน้ำในอากาศ / fog"
+    },
+    {
+      "query": "แสง",
+      "sense": null,
+      "category": "noun:light",
+      "intended": "สิ่งที่ทำให้มองเห็น / light"
+    },
+    {
+      "query": "เศร้า",
+      "sense": null,
+      "category": "emotion",
+      "intended": "ความรู้สึกโศกเสียใจ"
+    },
+    {
+      "query": "ดีใจ",
+      "sense": null,
+      "category": "emotion",
+      "intended": "ความรู้สึกยินดี"
+    },
+    {
+      "query": "เหงา",
+      "sense": null,
+      "category": "emotion",
+      "intended": "ความรู้สึกเปล่าเปลี่ยว"
+    },
+    {
+      "query": "อาย",
+      "sense": null,
+      "category": "emotion",
+      "intended": "ความรู้สึกขวยเขิน/ละอาย"
+    },
+    {
+      "query": "เกลียด",
+      "sense": null,
+      "category": "emotion",
+      "intended": "ความรู้สึกไม่ชอบอย่างแรง"
+    },
+    {
+      "query": "วิ่ง",
+      "sense": null,
+      "category": "verb:motion",
+      "intended": "เคลื่อนที่ด้วยเท้าอย่างเร็ว"
+    },
+    {
+      "query": "นั่ง",
+      "sense": null,
+      "category": "verb:posture",
+      "intended": "อยู่ในท่านั่ง"
+    },
+    {
+      "query": "ยืน",
+      "sense": null,
+      "category": "verb:posture",
+      "intended": "อยู่ในท่ายืน"
+    },
+    {
+      "query": "กระโดด",
+      "sense": null,
+      "category": "verb:motion",
+      "intended": "ดีดตัวให้พ้นพื้น"
+    },
+    {
+      "query": "คลาน",
+      "sense": null,
+      "category": "verb:motion",
+      "intended": "เคลื่อนตัวโดยใช้มือเข่าหรือท้องใกล้พื้น"
+    },
+    {
+      "query": "กระซิบ",
+      "sense": null,
+      "category": "verb:speech",
+      "intended": "พูดเสียงเบา"
+    },
+    {
+      "query": "ตะโกน",
+      "sense": null,
+      "category": "verb:speech",
+      "intended": "พูดหรือร้องเสียงดัง"
+    },
+    {
+      "query": "ถาม",
+      "sense": null,
+      "category": "verb:speech",
+      "intended": "พูดเพื่อขอคำตอบ"
+    },
+    {
+      "query": "ตอบ",
+      "sense": null,
+      "category": "verb:speech",
+      "intended": "พูดตอบคำถาม"
+    },
+    {
+      "query": "เรียก",
+      "sense": null,
+      "category": "verb:speech",
+      "intended": "ออกเสียงเพื่อให้หันมาหรือมา"
+    },
+    {
+      "query": "งาม",
+      "sense": null,
+      "category": "adjective:appearance",
+      "intended": "สวยงาม"
+    },
+    {
+      "query": "สว่าง",
+      "sense": null,
+      "category": "adjective:light",
+      "intended": "มีแสงมาก / ไม่มืด"
+    },
+    {
+      "query": "ร้อน",
+      "sense": null,
+      "category": "adjective:temperature",
+      "intended": "มีอุณหภูมิสูง"
+    },
+    {
+      "query": "เย็น",
+      "sense": null,
+      "category": "adjective:temperature",
+      "intended": "มีอุณหภูมิต่ำ/ไม่ร้อน"
+    },
+    {
+      "query": "หอม",
+      "sense": null,
+      "category": "adjective:smell",
+      "intended": "มีกลิ่นดี"
+    },
+    {
+      "query": "ช้า",
+      "sense": null,
+      "category": "adjective:speed",
+      "intended": "ไม่เร็ว / ใช้เวลามาก"
+    },
+    {
+      "query": "นุ่ม",
+      "sense": null,
+      "category": "adjective:texture",
+      "intended": "อ่อนนิ่มสัมผัสไม่แข็ง"
+    },
+    {
+      "query": "แข็ง",
+      "sense": null,
+      "category": "adjective:texture",
+      "intended": "ไม่อ่อน/ไม่อ่อนนุ่ม"
+    },
+    {
+      "query": "เปียก",
+      "sense": null,
+      "category": "adjective:state",
+      "intended": "มีน้ำชุ่มติดอยู่"
+    },
+    {
+      "query": "หนาว",
+      "sense": null,
+      "category": "adjective:temperature",
+      "intended": "รู้สึกเย็นจัด"
+    },
+    {
+      "query": "ห้อง",
+      "sense": null,
+      "category": "noun:place",
+      "intended": "พื้นที่ภายในอาคารที่กั้นเป็นส่วน"
+    },
+    {
+      "query": "เมือง",
+      "sense": null,
+      "category": "noun:place",
+      "intended": "ชุมชน/เขตเมือง"
+    },
+    {
+      "query": "ถนน",
+      "sense": null,
+      "category": "noun:place",
+      "intended": "ทางสำหรับสัญจร"
+    },
+    {
+      "query": "ประตู",
+      "sense": null,
+      "category": "noun:object/place",
+      "intended": "ช่องทางเข้าออกที่เปิดปิดได้"
+    },
+    {
+      "query": "ป่า",
+      "sense": null,
+      "category": "noun:nature/place",
+      "intended": "บริเวณที่มีต้นไม้หนาแน่น"
+    },
+    {
+      "query": "มอง",
+      "sense": null,
+      "category": "verb:perception",
+      "intended": "ใช้สายตาดู"
+    },
+    {
+      "query": "ยิ้ม",
+      "sense": null,
+      "category": "verb:expression",
+      "intended": "แสดงสีหน้าด้วยการยกมุมปาก"
+    },
+    {
+      "query": "ร้องไห้",
+      "sense": null,
+      "category": "verb:expression",
+      "intended": "หลั่งน้ำตาจากความรู้สึก"
+    },
+    {
+      "query": "หัวเราะ",
+      "sense": null,
+      "category": "verb:expression",
+      "intended": "แสดงอาการขบขันด้วยเสียง"
+    },
+    {
+      "query": "ฝัน",
+      "sense": null,
+      "category": "abstract/mental",
+      "intended": "เห็นหรือรู้สึกเป็นเรื่องราวขณะหลับ"
+    }
+  ]
+}
