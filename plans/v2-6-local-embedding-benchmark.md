@@ -180,3 +180,23 @@ Colab test suite `tests/test_dense_v26_local.py` passed 4/4:
 - Qwen instruction-aware 256d profile
 - challenger documents remain unprefixed
 - Qwen instruction applied to query only
+
+
+## V2.5 baseline rebuild result
+
+Fresh Colab T4 rebuild completed successfully and is stored in the persistent artifact path.
+
+Observed metadata:
+- model: `google/embeddinggemma-300m`
+- profile: `embeddinggemma-300m-256`
+- rows: 52,004 dictionary senses
+- dimensions: 256
+- dtype: float32
+- embedding file size: ~50.785 MiB
+- model load: ~41.323s
+- encoding: ~259.965s (~4m 20s)
+- batches: 813 at batch size 64
+- throughput: ~3.13 batches/s
+- device: cuda:0
+- normalized embeddings: yes
+- native query/document methods: `encode_query` / `encode_document`
