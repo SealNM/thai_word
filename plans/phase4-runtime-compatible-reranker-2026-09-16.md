@@ -1019,3 +1019,40 @@ Kaggle recovery flow:
 5. Export the secret into the process environment before invoking the build command.
 6. Optionally verify authentication with `hf auth whoami`.
 7. Re-run the exact V2.5 dense-index build; no retraining or model-selection step is involved.
+
+
+### EmbeddingGemma dense-index rebuild completed
+
+After accepting the EmbeddingGemma license and authenticating the Kaggle runtime, the exact V2.5 dense index rebuild completed successfully.
+
+Observed build result:
+
+- model key: `embeddinggemma-300m-256`
+- model id: `google/embeddinggemma-300m`
+- query method: `encode_query`
+- document method: `encode_document`
+- truncate dim: **256**
+- normalized embeddings: **true**
+- rows / indexed senses: **52,004**
+- dimensions: **256**
+- dtype: `float32`
+- dense embedding artifact bytes: **53,252,096**
+- dense embedding artifact size: **50.785 MiB**
+- requested device: `cuda`
+- actual device: `cuda:0`
+- model load: **22.886 s**
+- document encoding: **267.416 s**
+- text template: `{headword}: {definition}`
+
+Interpretation:
+
+- V1/V2.5 base retrieval artifacts are now available in the Kaggle runtime;
+- the rebuild preserved the locked V2.5 model/profile and did not change ranking architecture;
+- the gated-access incident is resolved;
+- no retraining or benchmark selection occurred.
+
+Next gate:
+
+1. run the full `search_writer.py` path with `reranker_mode=optional`;
+2. confirm `reranker_status=writer_reranked` rather than `fallback_v25`;
+3. if successful, run the existing Wave G profiler on the same GPU runtime and archive the resulting runtime report.
