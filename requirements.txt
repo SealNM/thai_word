@@ -9,5 +9,4 @@ transformers>=4.56.0,<6
 datasets>=3.0
 accelerate>=1.0
 google-genai>=2.22,<3
-google-auth==2.49.0
 bitsandbytes>=0.50.2,<0.51
