@@ -10,6 +10,7 @@ from unittest.mock import patch
 from scripts.substitutability_benchmark import (
     annotate_interactively,
     export_candidates,
+    freeze_targets,
     inspect_targets,
     migrate_v2_to_v3,
 )
@@ -183,6 +184,38 @@ class SubstitutabilityBenchmarkTests(unittest.TestCase):
         self.assertEqual(report["targets"][0]["status"], "unique")
         self.assertEqual(report["targets"][0]["recommended_sense"], 1)
         self.assertEqual(report["targets"][1]["status"], "needs_review")
+
+    def test_freeze_targets_requires_verified_sense(self) -> None:
+        report = {
+            "targets": [
+                {
+                    "query": "เมฆ",
+                    "category": "noun:nature",
+                    "intended": "cloud",
+                    "recommended_sense": 1,
+                    "senses": [{"sense": 1, "definition": "ไอน้ำบนท้องฟ้า"}],
+                }
+            ]
+        }
+
+        with tempfile.TemporaryDirectory() as directory:
+            report_path = Path(directory) / "report.json"
+            output_path = Path(directory) / "frozen.json"
+            report_path.write_text(
+                json.dumps(report, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            args = SimpleNamespace(
+                report=str(report_path),
+                output=str(output_path),
+            )
+
+            freeze_targets(args)
+            frozen = json.loads(output_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(len(frozen["queries"]), 1)
+        self.assertEqual(frozen["queries"][0]["query"], "เมฆ")
+        self.assertEqual(frozen["queries"][0]["sense"], 1)
 
     def test_export_builds_schema_v3_annotation_rows(self) -> None:
         result = {
