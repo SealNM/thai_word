@@ -71,6 +71,14 @@ MODEL_PROFILES: dict[str, dict[str, Any]] = {
             "unpad_inputs": False,
         },
     },
+    "arctic-embed-l-v2-256": {
+        "model_id": "Snowflake/snowflake-arctic-embed-l-v2.0",
+        "trust_remote_code": False,
+        "query_prefix": "query: ",
+        "document_prefix": "",
+        "truncate_dim": 256,
+        "max_seq_length": 512,
+    },
     "gte-base-experimental": {
         "model_id": "Alibaba-NLP/gte-multilingual-base",
         "trust_remote_code": True,
