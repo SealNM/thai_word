@@ -1,7 +1,7 @@
 # Thai Words — Phase 4 Runtime-Compatible Writer Reranker Plan
 
 Date: 2026-09-16  
-Status: **Planned — Phase 3 frozen benchmark consumed; production contract not yet implemented**  
+Status: **In progress — Wave A runtime contract adapter and category diagnostic implemented**  
 Base commit: `959c502254529e7260fdbf98a615b0e4e7858145`  
 Working branch: `plan/phase4-runtime-compatible-reranker-2026-09-16`
 
@@ -509,3 +509,47 @@ Quality promotion beyond the exact Phase 3 contract requires the new Phase 4 hol
 8. only then consider category-free retraining, distillation, smaller reranker, or a production-retrained model
 
 This order avoids making a 2GB experimental artifact a hard runtime dependency before we know the actual interface and deployment cost.
+
+
+## Wave A implementation checkpoint — 2026-09-16
+
+Implemented on `feat/phase4-runtime-compatible-reranker-2026-09-16`:
+
+- `thai_writer_runtime.py`
+  - canonical annotation-free adapter from one V2.5 result into the writer-reranker inference row;
+  - preserves the retrieval evidence used by Phase 3;
+  - exposes category modes `include`, `none`, and `omit`;
+  - provides shared learned-feature and neural text-pair builders;
+  - validates V2.5 rank and candidate shape.
+
+- `scripts/writer_relevance_phase4_category_diagnostic.py`
+  - train/validation-only development diagnostic;
+  - compares learned scorer behavior for category included / forced to `<none>` / omitted;
+  - optionally evaluates the saved Phase 3 CrossEncoder checkpoint under the same three runtime input modes;
+  - explicitly reports `benchmark_split_evaluated: false`;
+  - never uses benchmark rows for model selection.
+
+- `tests/test_writer_runtime_contract.py`
+  - no human annotation leakage;
+  - V2.5 retrieval evidence preservation;
+  - category-mode behavior for learned and neural representations;
+  - evidence remains unchanged when category is removed;
+  - invalid mode/rank guards.
+
+Next Wave A action:
+
+Run the diagnostic with the externally archived Phase 3 checkpoint. This is development analysis only; do not treat its validation result as a new unbiased benchmark.
+
+```bash
+python -m scripts.writer_relevance_phase4_category_diagnostic \
+  --input evaluation/writer_relevance_50_annotations.approved.jsonl \
+  --model-path artifacts/phase3/bge-reranker-v2-m3-locked \
+  --device cuda \
+  --eval-batch-size 4 \
+  --output evaluation/writer_relevance_phase4_category_diagnostic.json
+```
+
+Decision gate:
+
+- if `omit` or `none` is close to the original category-aware contract, proceed toward a category-free persisted production scorer;
+- if category removal materially harms validation behavior, do not invent or tune an automatic category classifier against the consumed Phase 3 benchmark; freeze a fresh Phase 4 holdout first.
