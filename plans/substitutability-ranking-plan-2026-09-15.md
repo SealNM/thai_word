@@ -1,7 +1,7 @@
 # Thai Words — Writer Lexical Relevance & Utility Ranking Plan
 
 Date: 2026-09-15  
-Status: **In progress — schema v3 approved after first 30 human labels**  
+Status: **In progress — 10-query schema v3 pilot approved; Phase 2 target expansion active**  
 Baseline: `feat/dictionary-semantic-v2-5-embeddinggemma`  
 Working branch: `feat/dictionary-substitutability-benchmark`
 
@@ -500,7 +500,69 @@ Across `ฝน#1`, `โกรธ#1`, `เดิน#1`, and `สวย#1`:
 
 The widening spread from NDCG 0.589 to 1.000 reinforces that query difficulty is heterogeneous. Some lexical neighborhoods are already ordered nearly perfectly by V2.5, while broader scene/context-heavy concepts remain much harder.
 
+
+### Approved 10-query pilot — schema v3
+
+The full 10-query / 300-pair pilot has now been reviewed and approved as the workflow checkpoint.
+
+Frozen file identity:
+- file: `substitutability_annotations.v3.assistant_completed.corrected.jsonl`
+- SHA-256: `158d1511f6deb7e688dbe768bf095e2b4c14517f27525721ba1bd03673dc5ff9`
+- rows: **300**
+- target senses: **10**
+- candidates per target: **30**
+
+Final top-10 mean metrics:
+- Useful@10 rate: **0.95**
+- HighUtility@10 rate: **0.90**
+- Noise@10 rate: **0.05**
+- SevereError@10 rate: **0.05**
+- relation diversity: **2.6**
+- NDCG@10: **0.8509870262**
+- MRR(first utility >= 2): **1.0**
+
+Full-label distribution:
+- utility 3: **185**
+- utility 2: **67**
+- utility 1: **27**
+- utility 0: **21**
+
+Final correction before approval:
+- `บ้าน -> ที่` was corrected to `utility=0`, `semantic_relation=unrelated` because the selected sense of `ที่` means a location marker / `ณ`, not a house/place synonym.
+
+Interpretation remains unchanged: V2.5 retrieval is strong enough to keep, while ranking/filtering quality varies substantially by query. The pilot is now frozen as a workflow/baseline checkpoint and must not be used alone for model selection.
+
 ## Phase 2 — Human-rated writer-relevance dataset
+
+Status: **active**
+
+Current implementation:
+- [x] freeze the approved 10-query / 300-pair pilot manifest;
+- [x] add a curated pool of 40 additional writer-oriented headwords, bringing the intended total to 50 target senses;
+- [x] spread the pool across nature/scene, emotion, motion/posture, speech, appearance/sensory, physical state, place/environment, expression/perception/mental concepts;
+- [x] add `inspect-targets` so every proposed headword is checked against the frozen V2.5 lexical artifact before its sense is frozen;
+- [ ] run `inspect-targets` on Colab/Kaggle and resolve every ambiguous/missing headword;
+- [ ] freeze the resulting 50 target senses;
+- [ ] export 30 V2.5 candidates per newly frozen target sense;
+- [ ] annotate/review the expanded benchmark;
+- [ ] split by target/headword family into train/validation/frozen benchmark only after labels are complete.
+
+Sense inspection command:
+
+```bash
+python scripts/substitutability_benchmark.py inspect-targets \
+  --config evaluation/writer_relevance_phase2_targets.json \
+  --index artifacts/v1 \
+  --output evaluation/writer_relevance_phase2_sense_report.json
+```
+
+A target is marked:
+- `unique` when the headword has exactly one stored sense and can be frozen automatically;
+- `explicit` when a configured sense is valid;
+- `needs_review` when multiple dictionary senses exist;
+- `missing_headword` when the proposed form is not an exact dictionary headword.
+
+Do not export Phase 2 candidates until all 40 new targets have a verified intended sense.
 
 After the revised annotation schema is ready:
 
