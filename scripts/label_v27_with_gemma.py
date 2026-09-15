@@ -238,6 +238,27 @@ def main() -> None:
         help="Maximum new labels this run; 0 means all pending seeds.",
     )
     parser.add_argument(
+        "--resume-from",
+        action="append",
+        default=[],
+        help=(
+            "Additional JSONL label file whose seed_ids count as completed. "
+            "Repeat this option to union multiple prior outputs."
+        ),
+    )
+    parser.add_argument(
+        "--shard-count",
+        type=int,
+        default=1,
+        help="Split pending seeds into this many deterministic worker shards.",
+    )
+    parser.add_argument(
+        "--shard-index",
+        type=int,
+        default=0,
+        help="Zero-based shard to process after completed seed_ids are removed.",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Print the first prompt without loading Gemma.",
@@ -256,16 +277,30 @@ def main() -> None:
         print(_prompt(seeds[0], args.top_k))
         return
 
-    completed = {
-        str(row.get("seed_id"))
-        for row in read_jsonl(args.output)
-        if row.get("seed_id")
-    }
+    completed_sources = [args.output, *args.resume_from]
+    completed: set[str] = set()
+    for completed_path in completed_sources:
+        completed.update(
+            str(row.get("seed_id"))
+            for row in read_jsonl(completed_path)
+            if row.get("seed_id")
+        )
+
     pending = [
         row
         for row in seeds
         if str(row.get("seed_id")) not in completed
     ]
+
+    shard_count = max(1, int(args.shard_count))
+    shard_index = int(args.shard_index)
+    if shard_index < 0 or shard_index >= shard_count:
+        raise SystemExit(
+            f"--shard-index must be in [0, {shard_count - 1}], "
+            f"got {shard_index}"
+        )
+    pending = pending[shard_index::shard_count]
+
     if args.limit > 0:
         pending = pending[: args.limit]
 
@@ -285,7 +320,8 @@ def main() -> None:
 
     print(
         f"[setup] loading {args.model} for "
-        f"{len(pending)} pending tasks",
+        f"{len(pending)} pending tasks "
+        f"(shard {shard_index + 1}/{shard_count})",
         flush=True,
     )
     teacher = GemmaTeacher(
@@ -385,6 +421,8 @@ def main() -> None:
                 "successes": successes,
                 "failures": failures,
                 "existing_before_run": len(completed),
+                "shard_index": shard_index,
+                "shard_count": shard_count,
                 "output": args.output,
             },
             ensure_ascii=False,
