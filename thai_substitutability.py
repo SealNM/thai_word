@@ -8,22 +8,35 @@ from pathlib import Path
 from typing import Any, Iterable
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
-RELATIONS = frozenset(
+SEMANTIC_RELATIONS = frozenset(
     {
         "direct",
-        "near_register",
         "subtype",
+        "broader_concept",
         "manner_action",
         "scene_context",
         "effect_state",
-        "literary_imagery",
         "weak_related",
         "opposite_misleading",
         "sense_mismatch",
         "unrelated",
         "unclear",
+    }
+)
+
+STYLE_TAGS = frozenset(
+    {
+        "literary",
+        "archaic",
+        "formal",
+        "colloquial",
+        "technical",
+        "dialect",
+        "figurative",
+        "other",
+        "unknown",
     }
 )
 
@@ -105,24 +118,55 @@ def validate_annotation_row(
         return errors
 
     utility = annotation.get("utility")
-    relation = annotation.get("relation")
+    semantic_relation = annotation.get("semantic_relation")
+    style_tags = annotation.get("style_tags")
 
-    if utility is None and relation is None and not require_labels:
-        return errors
+    if require_labels:
+        if utility not in {0, 1, 2, 3}:
+            errors.append(f"{pair_id}: annotation.utility must be one of 0,1,2,3.")
+        if semantic_relation not in SEMANTIC_RELATIONS:
+            errors.append(
+                f"{pair_id}: annotation.semantic_relation must be one of "
+                f"{sorted(SEMANTIC_RELATIONS)}."
+            )
+        if not isinstance(style_tags, list):
+            errors.append(f"{pair_id}: annotation.style_tags must be a list.")
+    else:
+        if utility is not None and utility not in {0, 1, 2, 3}:
+            errors.append(f"{pair_id}: annotation.utility must be one of 0,1,2,3 or null.")
+        if (
+            semantic_relation is not None
+            and semantic_relation not in SEMANTIC_RELATIONS
+        ):
+            errors.append(
+                f"{pair_id}: annotation.semantic_relation must be one of "
+                f"{sorted(SEMANTIC_RELATIONS)} or null."
+            )
+        if style_tags is not None and not isinstance(style_tags, list):
+            errors.append(
+                f"{pair_id}: annotation.style_tags must be a list or null."
+            )
 
-    if utility not in {0, 1, 2, 3}:
-        errors.append(f"{pair_id}: annotation.utility must be one of 0,1,2,3.")
-    if relation not in RELATIONS:
+    if isinstance(style_tags, list):
+        invalid_tags = [tag for tag in style_tags if tag not in STYLE_TAGS]
+        if invalid_tags:
+            errors.append(
+                f"{pair_id}: unsupported style tag(s): {sorted(set(invalid_tags))}."
+            )
+        if len(style_tags) != len(set(style_tags)):
+            errors.append(f"{pair_id}: annotation.style_tags must not contain duplicates.")
+        if "unknown" in style_tags and len(style_tags) > 1:
+            errors.append(
+                f"{pair_id}: style tag 'unknown' cannot be combined with other tags."
+            )
+
+    if (
+        semantic_relation in SEVERE_ERROR_RELATIONS
+        and utility in {1, 2, 3}
+    ):
         errors.append(
-            f"{pair_id}: annotation.relation must be one of {sorted(RELATIONS)}."
-        )
-
-    # Relation and writer utility are deliberately separate labels. Cross-POS
-    # and contextual words may be highly useful to a writer. Only relations
-    # that are intrinsically misleading/noise are constrained to utility 0.
-    if relation in SEVERE_ERROR_RELATIONS and utility in {1, 2, 3}:
-        errors.append(
-            f"{pair_id}: relation {relation!r} is a severe error and requires utility 0."
+            f"{pair_id}: semantic relation {semantic_relation!r} is a severe error "
+            "and requires utility 0."
         )
 
     return errors
@@ -176,7 +220,7 @@ def query_metrics(
 ) -> dict[str, Any]:
     ranked = sorted(rows, key=lambda row: int(row["retrieval"]["v25_rank"]))
     utilities = [int(row["annotation"]["utility"]) for row in ranked]
-    relations = [str(row["annotation"]["relation"]) for row in ranked]
+    relations = [str(row["annotation"]["semantic_relation"]) for row in ranked]
     top_utilities = utilities[:k]
     top_relations = relations[:k]
 
