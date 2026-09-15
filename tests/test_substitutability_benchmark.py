@@ -10,6 +10,7 @@ from unittest.mock import patch
 from scripts.substitutability_benchmark import (
     annotate_interactively,
     export_candidates,
+    inspect_targets,
     migrate_v2_to_v3,
 )
 from thai_substitutability import (
@@ -133,6 +134,55 @@ class SubstitutabilityBenchmarkTests(unittest.TestCase):
             validate_annotation_row(row, require_labels=False),
             [],
         )
+
+    def test_inspect_targets_marks_unique_and_ambiguous_senses(self) -> None:
+        lexical = SimpleNamespace()
+        config = {
+            "queries": [
+                {"query": "เมฆ", "sense": None, "category": "noun:nature"},
+                {"query": "รัก", "sense": None, "category": "emotion"},
+            ]
+        }
+
+        with tempfile.TemporaryDirectory() as directory:
+            config_path = Path(directory) / "targets.json"
+            output_path = Path(directory) / "report.json"
+            config_path.write_text(
+                json.dumps(config, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            args = SimpleNamespace(
+                config=str(config_path),
+                index="artifacts/v1",
+                output=str(output_path),
+            )
+
+            with (
+                patch(
+                    "scripts.substitutability_benchmark.load_artifacts",
+                    return_value=lexical,
+                ),
+                patch(
+                    "scripts.substitutability_benchmark.list_senses",
+                    side_effect=[
+                        [{"sense": 1, "definition": "ไอน้ำที่รวมตัวกันบนท้องฟ้า"}],
+                        [
+                            {"sense": 1, "definition": "ชอบ"},
+                            {"sense": 2, "definition": "มีใจผูกพัน"},
+                        ],
+                    ],
+                ),
+            ):
+                inspect_targets(args)
+
+            report = json.loads(output_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(report["target_count"], 2)
+        self.assertEqual(report["resolved_count"], 1)
+        self.assertEqual(report["unresolved_count"], 1)
+        self.assertEqual(report["targets"][0]["status"], "unique")
+        self.assertEqual(report["targets"][0]["recommended_sense"], 1)
+        self.assertEqual(report["targets"][1]["status"], "needs_review")
 
     def test_export_builds_schema_v3_annotation_rows(self) -> None:
         result = {
