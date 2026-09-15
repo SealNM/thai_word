@@ -1,0 +1,15 @@
+{
+  "description": "Phase-1 pipeline pilot only. Reuses the shared V2.5 regression queries; do not tune models against this 10-query set.",
+  "queries": [
+    {"query": "ฝน", "sense": 1, "category": "noun:nature"},
+    {"query": "โกรธ", "sense": null, "category": "emotion"},
+    {"query": "เดิน", "sense": 1, "category": "verb:motion"},
+    {"query": "สวย", "sense": 1, "category": "adjective:appearance"},
+    {"query": "มืด", "sense": 1, "category": "adjective:light"},
+    {"query": "รัก", "sense": 3, "category": "emotion/verb"},
+    {"query": "พูด", "sense": null, "category": "verb:speech"},
+    {"query": "เร็ว", "sense": null, "category": "adjective:speed"},
+    {"query": "กลัว", "sense": null, "category": "emotion"},
+    {"query": "บ้าน", "sense": 1, "category": "noun:place"}
+  ]
+}
