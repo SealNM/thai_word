@@ -68,6 +68,7 @@ MODEL_PROFILES: dict[str, dict[str, Any]] = {
         "max_seq_length": 512,
         "config_kwargs": {
             "use_memory_efficient_attention": False,
+            "unpad_inputs": False,
         },
     },
     "gte-base-experimental": {
