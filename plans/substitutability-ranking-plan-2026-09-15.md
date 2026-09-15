@@ -440,6 +440,38 @@ V2.5 top-10 after human annotation:
 
 Compared with `ฝน#1`, this query is almost ideal. This supports the hypothesis that ranking difficulty varies by concept and lexical-neighborhood structure rather than V2.5 retrieval failing uniformly. Continue the remaining pilot queries before selecting reranker thresholds or objectives.
 
+
+### Frozen checkpoint: เดิน#1 — schema v3 baseline
+
+V2.5 top-10 after human annotation:
+
+- Useful@10: **9/10 (0.90)**
+- HighUtility@10: **8/10 (0.80)**
+- Noise@10: **1/10 (0.10)**
+- SevereError@10: **1/10 (0.10)**
+- relation diversity: **4**
+- NDCG@10: **0.8374247076**
+- MRR(first utility >= 2): **1.0**
+
+Interpretation:
+- V2.5 retrieves a strong motion/action candidate pool;
+- one visible severe/noise result remains;
+- ranking quality is good but materially below the near-ideal `โกรธ#1`;
+- the higher relation diversity (4) is consistent with motion queries mixing direct alternatives, manners/actions, nearby motion concepts, and contextual vocabulary.
+
+### Three-query pilot snapshot
+
+Across `ฝน#1`, `โกรธ#1`, and `เดิน#1`:
+
+- mean Useful@10: **0.90**
+- mean HighUtility@10: **0.80**
+- mean Noise@10 rate: **0.10**
+- mean SevereError@10 rate: **0.10**
+- mean NDCG@10: **~0.7957**
+- MRR(first utility >= 2): **1.0 for all three**
+
+Early pattern: V2.5 consistently puts at least one high-utility result first and retrieves mostly useful vocabulary, while the main remaining weakness is how the rest of the top results are ordered and filtered. This continues to support V2.5 retrieval + learned writer-utility reranking.
+
 ## Phase 2 — Human-rated writer-relevance dataset
 
 After the revised annotation schema is ready:
