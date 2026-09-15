@@ -10,6 +10,7 @@ from unittest.mock import patch
 import numpy as np
 
 from scripts.writer_relevance_phase3_crossencoder import (
+    _configure_cuda_visibility,
     _delta_summary,
     _write_score_output,
     text_pair,
@@ -72,6 +73,18 @@ class FakeModel:
 
 
 class WriterRelevancePhase3CrossEncoderTests(unittest.TestCase):
+    def test_cuda_visibility_can_isolate_single_gpu_before_torch_import(self) -> None:
+        with patch.dict("os.environ", {}, clear=False):
+            self.assertEqual(_configure_cuda_visibility("0"), "0")
+            import os
+            self.assertEqual(os.environ["CUDA_VISIBLE_DEVICES"], "0")
+
+    def test_cuda_visibility_rejects_invalid_indices(self) -> None:
+        with self.assertRaises(ValueError):
+            _configure_cuda_visibility("gpu0")
+        with self.assertRaises(ValueError):
+            _configure_cuda_visibility("0,0")
+
     def test_text_pair_contains_bounded_retrieval_evidence_not_human_labels(self) -> None:
         row = _row("ฝน#1", 2, 3, "direct", "train")
         left, right = text_pair(row)

@@ -995,3 +995,41 @@ Next challenger before opening the frozen benchmark:
 4. compare pretrained-BGE hybrid vs fine-tuned-BGE hybrid on validation and stability;
 5. require no safety regression and explicitly inspect relation diversity, especially `ห้อง#1`;
 6. select one architecture/hyperparameter configuration before the single frozen-benchmark evaluation.
+
+
+### Kaggle multi-GPU fine-tune compatibility
+
+The first fine-tuned BGE challenger attempt on Kaggle failed before the first optimizer step because the notebook exposed multiple GPUs. Hugging Face Trainer therefore entered single-process `torch.nn.DataParallel`, while the Sentence Transformers cross-encoder BinaryCrossEntropy loss accessed `self.model.device`; `DataParallel` does not expose that attribute in this path.
+
+Observed failure:
+
+```text
+AttributeError: 'DataParallel' object has no attribute 'device'
+```
+
+This is infrastructure/trainer behavior, not a dataset, label, BGE-weight, or benchmark failure. The failed run produced no challenger result and must not be counted as an experiment outcome.
+
+The harness now accepts `--cuda-visible-devices` and applies `CUDA_VISIBLE_DEVICES` before importing Torch/SentenceTransformers. For the current 930-pair train split, use one GPU rather than DP/DDP:
+
+```bash
+python -m scripts.writer_relevance_phase3_crossencoder \
+  --input evaluation/writer_relevance_50_annotations.approved.jsonl \
+  --model BAAI/bge-reranker-v2-m3 \
+  --device cuda \
+  --cuda-visible-devices 0 \
+  --use-amp \
+  --epochs 1 \
+  --batch-size 2 \
+  --eval-batch-size 4 \
+  --learning-rate 1e-5 \
+  --warmup-ratio 0.1 \
+  --max-length 384 \
+  --seed 42 \
+  --score-output evaluation/writer_relevance_phase3_bge_v2_m3_finetuned_validation_scores.jsonl \
+  --include-per-query \
+  --output evaluation/writer_relevance_phase3_bge_v2_m3_finetuned_validation_report.json
+```
+
+The resulting report records `cuda_visible_devices` so the execution topology is auditable.
+
+For future large-scale training, Sentence Transformers recommends distributed launchers such as `torchrun`/Accelerate (DDP) over single-process DataParallel. That complexity is intentionally deferred here because the Phase 3 train split is only 930 pairs.

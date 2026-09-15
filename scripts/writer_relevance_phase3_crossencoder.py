@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +18,29 @@ from thai_substitutability import benchmark_metrics, read_jsonl
 
 
 DEFAULT_MODEL = "cross-encoder/mmarco-mMiniLMv2-L12-H384-v1"
+
+
+def _configure_cuda_visibility(value: str | None) -> str | None:
+    if value is None:
+        return os.environ.get("CUDA_VISIBLE_DEVICES")
+
+    normalized = ",".join(part.strip() for part in str(value).split(",") if part.strip())
+    if not normalized:
+        raise ValueError("--cuda-visible-devices must contain at least one GPU index.")
+
+    parts = normalized.split(",")
+    if any(not part.isdigit() for part in parts):
+        raise ValueError(
+            "--cuda-visible-devices must be a comma-separated list of non-negative "
+            "GPU indices, for example '0' or '0,1'."
+        )
+    if len(set(parts)) != len(parts):
+        raise ValueError("--cuda-visible-devices must not contain duplicate GPU indices.")
+
+    # This must run before torch / sentence-transformers are imported. The CLI calls it
+    # immediately after argument parsing so Hugging Face Trainer sees only these GPUs.
+    os.environ["CUDA_VISIBLE_DEVICES"] = normalized
+    return normalized
 
 
 def _clip_text(value: Any, *, max_chars: int = 700) -> str:
@@ -230,6 +254,7 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
         "finetuned": not no_finetune,
         "model_fit_pair_count": model_fit_pair_count,
         "device": str(getattr(model, "device", "unknown")),
+        "cuda_visible_devices": os.environ.get("CUDA_VISIBLE_DEVICES"),
         "train_pair_count": len(train),
         "validation_pair_count": len(validation),
         "train_query_count": len({row["query_id"] for row in train}),
@@ -303,6 +328,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-length", type=int, default=384)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--device", default=None)
+    parser.add_argument(
+        "--cuda-visible-devices",
+        default=None,
+        help=(
+            "Restrict visible CUDA devices before torch/SentenceTransformers import. "
+            "Use '0' for single-GPU training on Kaggle to avoid DataParallel."
+        ),
+    )
     parser.add_argument("--trust-remote-code", action="store_true")
     parser.add_argument("--use-amp", action="store_true")
     parser.add_argument(
@@ -317,6 +350,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     args = build_parser().parse_args()
+    _configure_cuda_visibility(args.cuda_visible_devices)
     if args.k < 1:
         raise ValueError("--k must be at least 1.")
     if args.epochs < 1:
