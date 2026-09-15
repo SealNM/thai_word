@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +16,7 @@ from thai_writer_runtime import runtime_row_from_v25_result
 
 WRITER_HYBRID_ALPHA = 0.5
 DEFAULT_RERANK_POOL = 30
+RERANKER_MODES = {"off", "optional", "required"}
 
 
 def _rank_normalize(scores: list[float] | np.ndarray) -> np.ndarray:
@@ -48,9 +49,13 @@ def _query_context(v25_results: list[dict[str, Any]]) -> tuple[str, int | None]:
 @dataclass
 class WriterSearch:
     v25: HybridSearcher
-    learned: LearnedWriterRanker
-    neural: NeuralWriterRanker
+    learned: LearnedWriterRanker | None = None
+    neural: NeuralWriterRanker | None = None
     alpha: float = WRITER_HYBRID_ALPHA
+    mode: str = "required"
+    initialization_error: str | None = None
+    last_reranker_status: str = field(default="not_run", init=False)
+    last_reranker_error: str | None = field(default=None, init=False)
 
     def __post_init__(self) -> None:
         if float(self.alpha) != WRITER_HYBRID_ALPHA:
@@ -58,6 +63,12 @@ class WriterSearch:
                 "Phase-4 WriterSearch uses the locked alpha=0.5. "
                 "Changing alpha requires a new model-selection cycle and holdout."
             )
+        if self.mode not in RERANKER_MODES:
+            raise ValueError(
+                f"Unknown reranker mode {self.mode!r}; expected one of {sorted(RERANKER_MODES)}."
+            )
+        if self.mode == "required" and (self.learned is None or self.neural is None):
+            raise ValueError("required mode needs both learned and neural rerankers.")
 
     @classmethod
     def from_paths(
@@ -65,27 +76,71 @@ class WriterSearch:
         *,
         lexical_index: str | Path,
         dense_index: str | Path,
-        learned_ranker: str | Path,
+        learned_ranker: str | Path | None = None,
         neural_model: str | Path | None = None,
         dense_device: str | None = None,
         neural_device: str | None = None,
         neural_batch_size: int = 4,
         neural_max_length: int = 384,
+        mode: str = "optional",
     ) -> "WriterSearch":
+        if mode not in RERANKER_MODES:
+            raise ValueError(
+                f"Unknown reranker mode {mode!r}; expected one of {sorted(RERANKER_MODES)}."
+            )
+
         lexical = load_artifacts(lexical_index)
         v25 = HybridSearcher.from_paths(
             lexical,
             str(dense_index),
             device=dense_device,
         )
-        learned = LearnedWriterRanker.load(learned_ranker)
-        neural = NeuralWriterRanker(
-            neural_model,
-            device=neural_device,
-            batch_size=neural_batch_size,
-            max_length=neural_max_length,
+
+        if mode == "off":
+            return cls(v25=v25, mode=mode)
+
+        try:
+            if learned_ranker is None:
+                raise ValueError("learned_ranker path is required when reranking is enabled.")
+            learned = LearnedWriterRanker.load(learned_ranker)
+            neural = NeuralWriterRanker(
+                neural_model,
+                device=neural_device,
+                batch_size=neural_batch_size,
+                max_length=neural_max_length,
+            )
+            return cls(v25=v25, learned=learned, neural=neural, mode=mode)
+        except Exception as exc:
+            if mode == "required":
+                raise
+            return cls(
+                v25=v25,
+                mode=mode,
+                initialization_error=f"{type(exc).__name__}: {exc}",
+            )
+
+    def _v25_search(
+        self,
+        query: str,
+        *,
+        top_k: int,
+        sense: int | None,
+        lexical_pool: int,
+        dense_pool: int,
+        lexical_weight: float,
+        dense_weight: float,
+        rrf_k: int,
+    ) -> list[dict[str, Any]]:
+        return self.v25.search(
+            query,
+            top_k=top_k,
+            sense=sense,
+            lexical_pool=lexical_pool,
+            dense_pool=dense_pool,
+            lexical_weight=lexical_weight,
+            dense_weight=dense_weight,
+            rrf_k=rrf_k,
         )
-        return cls(v25=v25, learned=learned, neural=neural)
 
     def search(
         self,
@@ -107,7 +162,22 @@ class WriterSearch:
         if rerank_pool < 1:
             raise ValueError("rerank_pool must be >= 1.")
 
-        v25_results = self.v25.search(
+        self.last_reranker_error = None
+
+        if self.mode == "off":
+            self.last_reranker_status = "off"
+            return self._v25_search(
+                query,
+                top_k=top_k,
+                sense=sense,
+                lexical_pool=lexical_pool,
+                dense_pool=dense_pool,
+                lexical_weight=lexical_weight,
+                dense_weight=dense_weight,
+                rrf_k=rrf_k,
+            )
+
+        v25_results = self._v25_search(
             query,
             top_k=rerank_pool,
             sense=sense,
@@ -118,78 +188,98 @@ class WriterSearch:
             rrf_k=rrf_k,
         )
         if not v25_results:
+            self.last_reranker_status = "writer_reranked"
             return []
 
-        query_definition, selected_sense = _query_context(v25_results)
-        runtime_rows = [
-            runtime_row_from_v25_result(
-                query=query,
-                query_definition=query_definition,
-                candidate=item,
-                v25_rank=index,
-                query_sense=selected_sense,
+        if self.learned is None or self.neural is None:
+            error = self.initialization_error or "writer reranker artifacts are unavailable"
+            if self.mode == "required":
+                raise RuntimeError(error)
+            self.last_reranker_status = "fallback_v25"
+            self.last_reranker_error = error
+            return v25_results[:top_k]
+
+        try:
+            query_definition, selected_sense = _query_context(v25_results)
+            runtime_rows = [
+                runtime_row_from_v25_result(
+                    query=query,
+                    query_definition=query_definition,
+                    candidate=item,
+                    v25_rank=index,
+                    query_sense=selected_sense,
+                )
+                for index, item in enumerate(v25_results, start=1)
+            ]
+
+            learned_scores = self.learned.score_rows(runtime_rows)
+            neural_scores = self.neural.score_rows(runtime_rows)
+
+            if len(learned_scores) != len(v25_results):
+                raise RuntimeError("Learned scorer returned the wrong number of rows.")
+            if len(neural_scores) != len(v25_results):
+                raise RuntimeError("Neural scorer returned the wrong number of rows.")
+
+            learned_safe = np.asarray(
+                [float(item["safe_score"]) for item in learned_scores],
+                dtype=np.float64,
             )
-            for index, item in enumerate(v25_results, start=1)
-        ]
+            neural_raw = np.asarray(neural_scores, dtype=np.float64)
 
-        learned_scores = self.learned.score_rows(runtime_rows)
-        neural_scores = self.neural.score_rows(runtime_rows)
+            learned_rank = _rank_normalize(learned_safe)
+            neural_rank = _rank_normalize(neural_raw)
+            hybrid = ((1.0 - self.alpha) * learned_rank) + (self.alpha * neural_rank)
 
-        if len(learned_scores) != len(v25_results):
-            raise RuntimeError("Learned scorer returned the wrong number of rows.")
-        if len(neural_scores) != len(v25_results):
-            raise RuntimeError("Neural scorer returned the wrong number of rows.")
+            enriched: list[dict[str, Any]] = []
+            for index, item in enumerate(v25_results):
+                learned_item = learned_scores[index]
+                clone = dict(item)
+                clone.update(
+                    {
+                        "original_v25_rank": index + 1,
+                        "writer_hybrid_score": float(hybrid[index]),
+                        "writer_learned_rank_score": float(learned_rank[index]),
+                        "writer_neural_rank_score": float(neural_rank[index]),
+                        "writer_learned_safe_score": float(learned_item["safe_score"]),
+                        "writer_expected_utility": float(learned_item["expected_utility"]),
+                        "writer_severe_probability": float(learned_item["severe_probability"]),
+                        "writer_neural_score": float(neural_raw[index]),
+                        "writer_alpha": float(self.alpha),
+                        "reranker_status": "writer_reranked",
+                    }
+                )
+                enriched.append(clone)
 
-        learned_safe = np.asarray(
-            [float(item["safe_score"]) for item in learned_scores],
-            dtype=np.float64,
-        )
-        neural_raw = np.asarray(neural_scores, dtype=np.float64)
-
-        learned_rank = _rank_normalize(learned_safe)
-        neural_rank = _rank_normalize(neural_raw)
-        hybrid = ((1.0 - self.alpha) * learned_rank) + (self.alpha * neural_rank)
-
-        enriched: list[dict[str, Any]] = []
-        for index, item in enumerate(v25_results):
-            learned_item = learned_scores[index]
-            clone = dict(item)
-            clone.update(
-                {
-                    "original_v25_rank": index + 1,
-                    "writer_hybrid_score": float(hybrid[index]),
-                    "writer_learned_rank_score": float(learned_rank[index]),
-                    "writer_neural_rank_score": float(neural_rank[index]),
-                    "writer_learned_safe_score": float(learned_item["safe_score"]),
-                    "writer_expected_utility": float(
-                        learned_item["expected_utility"]
-                    ),
-                    "writer_severe_probability": float(
-                        learned_item["severe_probability"]
-                    ),
-                    "writer_neural_score": float(neural_raw[index]),
-                    "writer_alpha": float(self.alpha),
-                    "reranker_status": "writer_reranked",
-                }
+            enriched.sort(
+                key=lambda item: (
+                    -float(item["writer_hybrid_score"]),
+                    int(item["original_v25_rank"]),
+                )
             )
-            enriched.append(clone)
+            for final_rank, item in enumerate(enriched, start=1):
+                item["final_rank"] = final_rank
 
-        enriched.sort(
-            key=lambda item: (
-                -float(item["writer_hybrid_score"]),
-                int(item["original_v25_rank"]),
-            )
-        )
-
-        for final_rank, item in enumerate(enriched, start=1):
-            item["final_rank"] = final_rank
-
-        return enriched[:top_k]
+            self.last_reranker_status = "writer_reranked"
+            return enriched[:top_k]
+        except Exception as exc:
+            if self.mode == "required":
+                raise
+            self.last_reranker_status = "fallback_v25"
+            self.last_reranker_error = f"{type(exc).__name__}: {exc}"
+            return v25_results[:top_k]
 
     def runtime_info(self) -> dict[str, Any]:
         return {
+            "mode": self.mode,
             "alpha": float(self.alpha),
             "default_rerank_pool": DEFAULT_RERANK_POOL,
-            "learned_category_mode": self.learned.category_mode,
-            "neural": self.neural.runtime_info(),
+            "learned_category_mode": (
+                self.learned.category_mode if self.learned is not None else None
+            ),
+            "initialization_error": self.initialization_error,
+            "last_reranker_status": self.last_reranker_status,
+            "last_reranker_error": self.last_reranker_error,
+            "neural": (
+                self.neural.runtime_info() if self.neural is not None else None
+            ),
         }
