@@ -1,6 +1,6 @@
 # V2.6 — Gemini Embedding 2 Retrieval Experiment
 
-Status: **implementation ready; API index builds and real benchmark pending**
+Status: **archived / not promoted; project baseline remains V2.5 EmbeddingGemma**
 
 Branch: `feat/dictionary-semantic-v26-gemini-embedding-2`
 
@@ -108,3 +108,13 @@ Promote V2.6 only if it materially improves candidate quality, especially:
 - does not regress semantic validity for `เดิน / ฝน / รัก / มืด`.
 
 If 256d is already clearly better than V2.5, prefer it for storage/compute unless 768d provides a meaningful additional gain.
+
+
+## Project-level disposition
+
+This experiment was implemented as an API-based embedding challenger, but it was never promoted to the baseline. Subsequent embedding/ranking research continued to select V2.5 EmbeddingGemma as the preferred local retrieval foundation.
+
+Keep this branch as a reproducible API challenger only. Do not add the Gemini API dependency to the normal search path without a future frozen benchmark showing a material, repeatable gain over V2.5.
+
+Canonical current decision:
+`plans/semantic-search-research-summary-2026-09-15.md` on `feat/dictionary-semantic-v2-5-embeddinggemma`.
