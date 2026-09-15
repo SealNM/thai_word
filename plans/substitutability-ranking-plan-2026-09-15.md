@@ -791,3 +791,41 @@ Validation-only result:
 - ordinal minus severe penalty: Useful@10 **0.9667**, Noise/SevereError **0.0333**, NDCG@10 **0.889148**, relation diversity **3.1111**, MRR **1.000**
 
 The frozen benchmark remains untouched. This learned baseline is only a floor for Phase 3 model comparison, not yet a production candidate.
+
+
+### Phase 3 cross-encoder comparison harness
+
+A validation-only cross-encoder experiment harness is implemented in `scripts/writer_relevance_phase3_crossencoder.py`.
+
+Experiment contract:
+- train on the frozen `train` target senses only;
+- evaluate on the frozen `validation` target senses only;
+- keep `benchmark` rows out of model fitting, prediction, and metric calculation;
+- encode target word + target definition + category against candidate word + candidate definition + bounded V2.5 lexical/dense retrieval evidence;
+- never expose human utility/relation/style labels in model input;
+- train writer utility as a scalar target `0..1` mapped from human utility `0..3`;
+- report deltas against both V2.5 validation metrics and the Phase 3 learned-baseline floor;
+- optionally emit per-query validation metrics for error analysis;
+- do not select or promote a model from the original 10-query pilot.
+
+Default first comparison candidate:
+- `cross-encoder/mmarco-mMiniLMv2-L12-H384-v1`;
+- this is an experiment default, not a production choice;
+- model name, epochs, batch size, learning rate, warmup, max length, and seed are explicit CLI parameters so later candidates can be compared with the same leakage-safe harness.
+
+Run on Colab/Kaggle with the approved 50-target annotation file present:
+
+```bash
+python scripts/writer_relevance_phase3_crossencoder.py \
+  --input evaluation/writer_relevance_50_annotations.approved.jsonl \
+  --include-per-query \
+  --output evaluation/writer_relevance_phase3_crossencoder_report.json
+```
+
+Focused tests cover:
+- model text excludes human annotation fields;
+- ordinal utility maps to the expected `0..1` training target;
+- metric deltas preserve direction;
+- benchmark rows never reach training or prediction.
+
+The frozen benchmark must remain untouched until a candidate is selected from train/validation evidence.
