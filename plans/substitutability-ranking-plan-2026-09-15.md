@@ -253,7 +253,7 @@ Recommended verification sequence:
 ```bash
 git pull origin feat/dictionary-substitutability-benchmark
 
-python -m unittest tests.test_substitutability_benchmark
+python -m unittest discover -s tests -p 'test_substitutability_benchmark.py'
 
 python scripts/substitutability_benchmark.py export \
   --index artifacts/v1 \
@@ -390,3 +390,8 @@ Do not tune the architecture against these ten queries. The first serious rankin
 > Thai Words should help a writer find the next useful word, not merely the nearest synonym.
 
 Preserve meaning and relevance, favor direct useful alternatives early, but also surface actions, imagery, subtypes, context, effects, and literary vocabulary that can help the writer construct richer prose.
+
+
+### Branch history note
+
+After the first Colab checkout, the research branch was squashed/force-updated while refining schema v2. This can make an already-checked-out local branch diverge from origin. During active notebook testing, do not rewrite this branch history again. If a notebook is still on the pre-squash branch, fetch and reset the local branch to origin after preserving any local annotation file.
