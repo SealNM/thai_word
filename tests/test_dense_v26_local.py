@@ -44,23 +44,17 @@ class DenseV26LocalEmbeddingTests(unittest.TestCase):
         self.assertEqual(profile["document_prefix"], "")
 
     def test_arctic_profile_matches_official_query_prefix(self) -> None:
-        profile = resolve_model_profile("arctic-embed-m-v2-256")
+        profile = resolve_model_profile("arctic-embed-l-v2-256")
 
         self.assertEqual(
             profile["model_id"],
-            "Snowflake/snowflake-arctic-embed-m-v2.0",
+            "Snowflake/snowflake-arctic-embed-l-v2.0",
         )
-        self.assertTrue(profile["trust_remote_code"])
+        self.assertFalse(profile["trust_remote_code"])
         self.assertEqual(profile["truncate_dim"], 256)
+        self.assertEqual(profile["max_seq_length"], 512)
         self.assertEqual(profile["query_prefix"], "query: ")
         self.assertEqual(profile["document_prefix"], "")
-        self.assertEqual(
-            profile["config_kwargs"],
-            {
-                "use_memory_efficient_attention": False,
-                "unpad_inputs": False,
-            },
-        )
 
     def test_local_challenger_documents_have_no_query_prefix(self) -> None:
         model = _FakeEncodeModel()
