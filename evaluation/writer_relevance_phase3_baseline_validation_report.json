@@ -1,0 +1,35 @@
+{
+  "status": "validation_only_phase3_baseline",
+  "benchmark_split_evaluated": false,
+  "train_pair_count": 930,
+  "train_query_count": 31,
+  "validation_pair_count": 270,
+  "validation_query_count": 9,
+  "baseline_v25": {
+    "useful_rate_at_k_mean": 0.9444444444444444,
+    "high_utility_rate_at_k_mean": 0.9333333333333333,
+    "noise_rate_at_k_mean": 0.05555555555555555,
+    "severe_error_rate_at_k_mean": 0.05555555555555555,
+    "relation_diversity_at_k_mean": 2.6666666666666665,
+    "ndcg_at_k_mean": 0.8623068038563164,
+    "mrr_high_utility_mean": 0.9444444444444444
+  },
+  "ordinal_expected_utility": {
+    "useful_rate_at_k_mean": 0.9666666666666666,
+    "high_utility_rate_at_k_mean": 0.9333333333333333,
+    "noise_rate_at_k_mean": 0.03333333333333334,
+    "severe_error_rate_at_k_mean": 0.03333333333333334,
+    "relation_diversity_at_k_mean": 3,
+    "ndcg_at_k_mean": 0.8891096909428098,
+    "mrr_high_utility_mean": 1
+  },
+  "ordinal_minus_severe": {
+    "useful_rate_at_k_mean": 0.9666666666666666,
+    "high_utility_rate_at_k_mean": 0.9333333333333333,
+    "noise_rate_at_k_mean": 0.03333333333333334,
+    "severe_error_rate_at_k_mean": 0.03333333333333334,
+    "relation_diversity_at_k_mean": 3.111111111111111,
+    "ndcg_at_k_mean": 0.8891483362282026,
+    "mrr_high_utility_mean": 1
+  }
+}
