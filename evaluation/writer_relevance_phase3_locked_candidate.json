@@ -1,0 +1,70 @@
+{
+  "schema_version": 1,
+  "status": "locked_before_frozen_benchmark",
+  "locked_date": "2026-09-16",
+  "dataset": {
+    "file": "evaluation/writer_relevance_50_annotations.approved.jsonl",
+    "sha256": "6e767583302a6df75c9b76d86fc73cbda150c98fbbe7c95b912a650a04a1a515",
+    "train_query_count": 31,
+    "train_pair_count": 930,
+    "validation_query_count": 9,
+    "validation_pair_count": 270,
+    "benchmark_query_count": 10,
+    "benchmark_pair_count": 300
+  },
+  "neural_model": {
+    "base_model": "BAAI/bge-reranker-v2-m3",
+    "objective": "writer_utility_soft_binary_regression_0_to_1",
+    "epochs": 1,
+    "batch_size": 2,
+    "eval_batch_size": 4,
+    "learning_rate": 1e-05,
+    "warmup_ratio": 0.1,
+    "max_length": 384,
+    "seed": 42,
+    "cuda_visible_devices": "0",
+    "use_amp": true,
+    "training_split": "train"
+  },
+  "learned_baseline": {
+    "seed": 42,
+    "severe_penalty": 1.0,
+    "training_split": "train"
+  },
+  "hybrid": {
+    "normalization": "within_query_average_rank_0_to_1",
+    "alpha": 0.5,
+    "baseline_weight": 0.5,
+    "neural_weight": 0.5,
+    "alpha_source": "validation_only_model_selection",
+    "alpha_must_not_be_reselected_on_benchmark": true
+  },
+  "validation_checkpoint": {
+    "useful_rate_at_k_mean": 0.9888888888888889,
+    "high_utility_rate_at_k_mean": 0.9666666666666666,
+    "noise_rate_at_k_mean": 0.011111111111111112,
+    "severe_error_rate_at_k_mean": 0.011111111111111112,
+    "relation_diversity_at_k_mean": 2.5555555555555554,
+    "ndcg_at_k_mean": 0.9189680079616045,
+    "mrr_high_utility_mean": 1.0
+  },
+  "stability_checkpoint": {
+    "positive_alpha_folds": 9,
+    "held_out_ndcg_wins": 5,
+    "held_out_ndcg_ties": 3,
+    "held_out_ndcg_losses": 1,
+    "mean_held_out_ndcg_delta": 0.021371925058117715,
+    "held_out_noise_regression_folds": 0,
+    "held_out_severe_regression_folds": 0,
+    "held_out_diversity_regression_folds": 4,
+    "mean_held_out_diversity_delta": -0.3333333333333333,
+    "stability_pass": true
+  },
+  "benchmark_policy": {
+    "evaluation_count": 1,
+    "no_hyperparameter_changes_after_opening": true,
+    "no_alpha_search": true,
+    "no_model_selection": true,
+    "report_v25_learned_neural_and_locked_hybrid": true
+  }
+}

@@ -1,7 +1,7 @@
 # Thai Words — Writer Lexical Relevance & Utility Ranking Plan
 
 Date: 2026-09-15  
-Status: **In progress — Phase 3 validation-only model and hybrid experiments active**  
+Status: **In progress — Phase 3 candidate locked; frozen benchmark pending reproducible checkpoint**  
 Baseline: `feat/dictionary-semantic-v2-5-embeddinggemma`  
 Working branch: `feat/dictionary-substitutability-benchmark`
 
@@ -1033,3 +1033,134 @@ python -m scripts.writer_relevance_phase3_crossencoder \
 The resulting report records `cuda_visible_devices` so the execution topology is auditable.
 
 For future large-scale training, Sentence Transformers recommends distributed launchers such as `torchrun`/Accelerate (DDP) over single-process DataParallel. That complexity is intentionally deferred here because the Phase 3 train split is only 930 pairs.
+
+
+### Phase 3 fine-tuned BGE candidate lock
+
+The one-epoch fine-tuned `BAAI/bge-reranker-v2-m3` challenger completed successfully on a single Kaggle GPU after the DataParallel compatibility fix.
+
+Fine-tune configuration:
+
+- train split only: **31 target senses / 930 pairs**
+- epochs: **1**
+- batch size: **2**
+- evaluation batch size: **4**
+- learning rate: **1e-5**
+- warmup ratio: **0.1**
+- max length: **384**
+- seed: **42**
+- AMP: enabled
+- visible CUDA devices: **0**
+- benchmark rows used for training: **0**
+
+Fine-tuned neural-only validation result:
+
+- Useful@10: **0.988889**
+- HighUtility@10: **0.988889**
+- Noise@10: **0.011111**
+- SevereError@10: **0.011111**
+- relation diversity: **2.555556**
+- NDCG@10: **0.900274**
+- MRR high utility: **1.000000**
+
+This is the first neural-only candidate to exceed the learned-baseline validation NDCG (**0.889148**) while also reducing Noise/SevereError.
+
+Hybrid validation grid selected **alpha=0.5**:
+
+- learned-baseline weight: **0.5**
+- fine-tuned BGE weight: **0.5**
+- Useful@10: **0.988889**
+- HighUtility@10: **0.966667**
+- Noise@10: **0.011111**
+- SevereError@10: **0.011111**
+- relation diversity: **2.555556**
+- NDCG@10: **0.918968**
+- MRR high utility: **1.000000**
+
+Compared with the pretrained-BGE hybrid incumbent (alpha=0.4, NDCG **0.907113**), the fine-tuned hybrid improves NDCG by about **+0.011855** while keeping the same aggregate Noise/SevereError rate.
+
+Fine-tuned hybrid leave-one-query-out stability:
+
+- selected alpha: **0.5 in 7/9 folds**, **0.4 in 2/9 folds**
+- positive-alpha folds: **9/9**
+- held-out NDCG: **5 wins / 3 ties / 1 loss**
+- mean held-out NDCG delta: **+0.021372**
+- minimum held-out NDCG delta: **-0.088772**
+- maximum held-out NDCG delta: **+0.112721**
+- held-out Noise regressions: **0/9**
+- held-out SevereError regressions: **0/9**
+- held-out diversity regressions: **4/9**
+- mean held-out diversity delta: **-0.333333**
+- stability gate: **PASS**
+
+`ห้อง#1` remains the main failure case: at the selected held-out alpha its NDCG drops by about **-0.088772**. Relation diversity remains the principal trade-off, although the mean held-out diversity loss is slightly smaller than with the pretrained-BGE hybrid.
+
+Decision:
+
+> Lock **fine-tuned BGE + learned baseline, alpha=0.5** as the Phase 3 candidate before the frozen benchmark.
+
+The locked machine-readable configuration is stored in:
+
+- `evaluation/writer_relevance_phase3_locked_candidate.json`
+
+No further model selection, alpha tuning, learning-rate tuning, epoch tuning, or validation-driven architecture changes are allowed before the first frozen-benchmark evaluation.
+
+### Reproducible checkpoint requirement before benchmark
+
+The successful challenger run did not specify `--model-output`, so its fine-tuned weights were not intentionally preserved as the locked artifact. The frozen benchmark must therefore remain closed until the exact locked training configuration is rerun with a saved model checkpoint and its validation report is checked against the locked candidate.
+
+Rerun the same configuration, adding only `--model-output`:
+
+```bash
+python -m scripts.writer_relevance_phase3_crossencoder \
+  --input evaluation/writer_relevance_50_annotations.approved.jsonl \
+  --model BAAI/bge-reranker-v2-m3 \
+  --device cuda \
+  --cuda-visible-devices 0 \
+  --use-amp \
+  --epochs 1 \
+  --batch-size 2 \
+  --eval-batch-size 4 \
+  --learning-rate 1e-5 \
+  --warmup-ratio 0.1 \
+  --max-length 384 \
+  --seed 42 \
+  --model-output artifacts/phase3/bge-reranker-v2-m3-locked \
+  --score-output evaluation/writer_relevance_phase3_bge_v2_m3_locked_validation_scores.jsonl \
+  --include-per-query \
+  --output evaluation/writer_relevance_phase3_bge_v2_m3_locked_validation_report.json
+```
+
+Then run the existing hybrid + stability scripts against the saved-run validation scores. If the locked rerun materially changes candidate selection or fails the predeclared stability gate, do not open the benchmark; investigate reproducibility first rather than tuning against benchmark data.
+
+### Frozen benchmark one-shot harness
+
+`scripts/writer_relevance_phase3_frozen_benchmark.py` is the only intended Phase 3 path for opening the frozen benchmark.
+
+Guards:
+
+- requires the explicit `--confirm-frozen-benchmark` flag;
+- verifies the approved 1,500-row dataset SHA-256;
+- verifies exact frozen train/validation/benchmark query IDs and pair counts;
+- loads the already-saved fine-tuned checkpoint instead of fitting a neural model;
+- fits the learned baseline on the train split only;
+- reads the locked alpha (**0.5**) from the candidate manifest;
+- does not contain an alpha-grid/model-selection step;
+- reports V2.5, learned baseline, neural-only, and locked-hybrid benchmark metrics;
+- records that no benchmark-based selection or alpha reselection occurred.
+
+Do not run this command until the saved checkpoint reproduction step above is accepted. When ready, the single benchmark command is:
+
+```bash
+python -m scripts.writer_relevance_phase3_frozen_benchmark \
+  --input evaluation/writer_relevance_50_annotations.approved.jsonl \
+  --candidate-manifest evaluation/writer_relevance_phase3_locked_candidate.json \
+  --split-manifest evaluation/writer_relevance_50_split_manifest.json \
+  --model-path artifacts/phase3/bge-reranker-v2-m3-locked \
+  --device cuda \
+  --include-per-query \
+  --confirm-frozen-benchmark \
+  --output evaluation/writer_relevance_phase3_frozen_benchmark_report.json
+```
+
+After this command is run once, treat the benchmark as opened. Do not change the locked candidate in response to that result.
