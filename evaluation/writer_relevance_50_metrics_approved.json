@@ -1,5 +1,6 @@
 {
   "status": "approved_human_benchmark",
+  "metric_definition": "Matches thai_substitutability.benchmark_metrics: ideal DCG is computed from all 30 candidates per query and evaluated at K=10.",
   "k": 10,
   "all": {
     "query_count": 50,
@@ -9,7 +10,7 @@
     "noise_rate_at_k_mean": 0.06,
     "severe_error_rate_at_k_mean": 0.06,
     "relation_diversity_at_k_mean": 2.64,
-    "ndcg_at_k_mean": 0.9650842599891452,
+    "ndcg_at_k_mean": 0.8604147956623268,
     "mrr_high_utility_mean": 0.99
   },
   "train": {
@@ -20,7 +21,7 @@
     "noise_rate_at_k_mean": 0.061290322580645165,
     "severe_error_rate_at_k_mean": 0.061290322580645165,
     "relation_diversity_at_k_mean": 2.6451612903225805,
-    "ndcg_at_k_mean": 0.9710024802727864,
+    "ndcg_at_k_mean": 0.872777419373699,
     "mrr_high_utility_mean": 1
   },
   "validation": {
@@ -31,7 +32,7 @@
     "noise_rate_at_k_mean": 0.05555555555555555,
     "severe_error_rate_at_k_mean": 0.05555555555555555,
     "relation_diversity_at_k_mean": 2.6666666666666665,
-    "ndcg_at_k_mean": 0.9553632871479256,
+    "ndcg_at_k_mean": 0.8623068038563164,
     "mrr_high_utility_mean": 0.9444444444444444
   },
   "benchmark": {
@@ -42,7 +43,7 @@
     "noise_rate_at_k_mean": 0.06,
     "severe_error_rate_at_k_mean": 0.06,
     "relation_diversity_at_k_mean": 2.6,
-    "ndcg_at_k_mean": 0.9554866526669553,
+    "ndcg_at_k_mean": 0.8203878547824818,
     "mrr_high_utility_mean": 1
   }
 }
