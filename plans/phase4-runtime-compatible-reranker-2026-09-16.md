@@ -1,9 +1,9 @@
 # Thai Words — Phase 4 Runtime-Compatible Writer Reranker Plan
 
 Date: 2026-09-16  
-Status: **In progress — Wave A runtime contract adapter and category diagnostic implemented**  
+Status: **In progress — Wave A category-free contract accepted; Wave B persisted learned scorer implemented**  
 Base commit: `959c502254529e7260fdbf98a615b0e4e7858145`  
-Working branch: `plan/phase4-runtime-compatible-reranker-2026-09-16`
+Working branch: `feat/phase4-runtime-compatible-reranker-2026-09-16`
 
 ## Phase 3 decision carried forward
 
@@ -553,3 +553,103 @@ Decision gate:
 
 - if `omit` or `none` is close to the original category-aware contract, proceed toward a category-free persisted production scorer;
 - if category removal materially harms validation behavior, do not invent or tune an automatic category classifier against the consumed Phase 3 benchmark; freeze a fresh Phase 4 holdout first.
+
+
+## Wave A diagnostic result — category-free contract accepted
+
+The train/validation-only category diagnostic completed successfully using the saved Phase 3 checkpoint.
+
+No benchmark rows were evaluated or used for selection.
+
+### Learned scorer
+
+| Category mode | Feature count | Useful | HighUtility | Noise | Severe | Diversity | NDCG | MRR |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| include | 43 | 0.966667 | 0.933333 | 0.033333 | 0.033333 | 3.111111 | 0.889148 | 1.0 |
+| none | 34 | 0.966667 | 0.944444 | 0.033333 | 0.033333 | 2.888889 | 0.891203 | 1.0 |
+| omit | 33 | 0.966667 | 0.944444 | 0.033333 | 0.033333 | 2.888889 | 0.891203 | 1.0 |
+
+### Saved neural checkpoint
+
+| Category mode | Useful | HighUtility | Noise | Severe | Diversity | NDCG | MRR |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| include | 0.988889 | 0.988889 | 0.011111 | 0.011111 | 2.444444 | 0.902097 | 1.0 |
+| none | 0.988889 | 0.988889 | 0.011111 | 0.011111 | 2.666667 | **0.908070** | 1.0 |
+| omit | 0.988889 | 0.988889 | 0.011111 | 0.011111 | 2.666667 | 0.906976 | 1.0 |
+
+V2.5 validation NDCG remains **0.862307**.
+
+Decision:
+
+> Use **category_mode=omit** as the Phase 4 production contract.
+
+Reasons:
+
+- normal runtime has no authoritative category field;
+- removing category does not degrade Useful/Noise/Severe/MRR;
+- learned NDCG slightly improves from **0.889148 -> 0.891203**;
+- neural NDCG remains above the category-aware checkpoint (**0.906976 vs 0.902097**);
+- `none` is numerically slightly higher for neural scoring, but it preserves a synthetic `หมวด: <none>` token that has no semantic meaning at runtime;
+- `omit` is therefore the cleaner and more truthful production contract.
+
+This is an engineering contract decision on already-used development data, not a new unbiased quality benchmark.
+
+A compact result is archived in:
+
+- `evaluation/writer_relevance_phase4_category_diagnostic_summary.json`
+
+---
+
+## Wave B implementation checkpoint — persisted learned scorer
+
+Implemented:
+
+- `thai_writer_learned.py`
+  - category-free `LearnedWriterRanker`;
+  - three cumulative writer-utility probability models;
+  - severe-error probability model;
+  - expected utility / severe probability / safe score output;
+  - deterministic seed handling;
+  - runtime schema and artifact version guards;
+  - persisted `DictVectorizer` and fitted models with `joblib`;
+  - metadata validation on load;
+  - no fitting during inference.
+
+- `scripts/build_writer_learned_ranker.py`
+  - train-split-only artifact builder;
+  - records source dataset SHA-256;
+  - writes the production category contract as `omit`;
+  - records feature names/count, seed, severe penalty, train pair/query counts.
+
+- `tests/test_writer_learned_ranker.py`
+  - fit/save/load round trip;
+  - inference without annotation fields;
+  - category excluded from production feature schema;
+  - runtime-schema mismatch rejection;
+  - same-seed deterministic score check;
+  - rejection of category-aware production fit.
+
+Artifact layout:
+
+```text
+artifacts/writer-reranker/
+├── learned_ranker.joblib
+└── learned_ranker_metadata.json
+```
+
+Build command:
+
+```bash
+python -m scripts.build_writer_learned_ranker \
+  --input evaluation/writer_relevance_50_annotations.approved.jsonl \
+  --output artifacts/writer-reranker \
+  --seed 42 \
+  --severe-penalty 1.0
+```
+
+Next gate:
+
+1. run focused Wave A/B tests;
+2. build the learned artifact;
+3. load it back and score validation rows without fitting;
+4. once the persisted artifact is verified, continue to Wave C neural runtime wrapper.

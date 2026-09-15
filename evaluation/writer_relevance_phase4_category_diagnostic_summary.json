@@ -1,0 +1,84 @@
+{
+  "status": "phase4_runtime_category_diagnostic_summary",
+  "diagnostic_only": true,
+  "benchmark_split_evaluated": false,
+  "benchmark_pairs_used_for_selection": 0,
+  "train_pair_count": 930,
+  "validation_pair_count": 270,
+  "train_query_count": 31,
+  "validation_query_count": 9,
+  "v25_validation": {
+    "useful_rate_at_k_mean": 0.9444444444444444,
+    "high_utility_rate_at_k_mean": 0.9333333333333333,
+    "noise_rate_at_k_mean": 0.05555555555555555,
+    "severe_error_rate_at_k_mean": 0.05555555555555555,
+    "relation_diversity_at_k_mean": 2.6666666666666665,
+    "ndcg_at_k_mean": 0.8623068038563164,
+    "mrr_high_utility_mean": 0.9444444444444444
+  },
+  "learned": {
+    "include": {
+      "feature_count": 43,
+      "ndcg_at_k_mean": 0.8891483362282026,
+      "useful_rate_at_k_mean": 0.9666666666666666,
+      "high_utility_rate_at_k_mean": 0.9333333333333333,
+      "noise_rate_at_k_mean": 0.03333333333333334,
+      "severe_error_rate_at_k_mean": 0.03333333333333334,
+      "relation_diversity_at_k_mean": 3.111111111111111,
+      "mrr_high_utility_mean": 1
+    },
+    "none": {
+      "feature_count": 34,
+      "ndcg_at_k_mean": 0.8912033627850455,
+      "useful_rate_at_k_mean": 0.9666666666666666,
+      "high_utility_rate_at_k_mean": 0.9444444444444444,
+      "noise_rate_at_k_mean": 0.03333333333333334,
+      "severe_error_rate_at_k_mean": 0.03333333333333334,
+      "relation_diversity_at_k_mean": 2.888888888888889,
+      "mrr_high_utility_mean": 1
+    },
+    "omit": {
+      "feature_count": 33,
+      "ndcg_at_k_mean": 0.8912033627850455,
+      "useful_rate_at_k_mean": 0.9666666666666666,
+      "high_utility_rate_at_k_mean": 0.9444444444444444,
+      "noise_rate_at_k_mean": 0.03333333333333334,
+      "severe_error_rate_at_k_mean": 0.03333333333333334,
+      "relation_diversity_at_k_mean": 2.888888888888889,
+      "mrr_high_utility_mean": 1
+    }
+  },
+  "neural": {
+    "include": {
+      "ndcg_at_k_mean": 0.9020966594754177,
+      "useful_rate_at_k_mean": 0.9888888888888889,
+      "high_utility_rate_at_k_mean": 0.9888888888888889,
+      "noise_rate_at_k_mean": 0.011111111111111112,
+      "severe_error_rate_at_k_mean": 0.011111111111111112,
+      "relation_diversity_at_k_mean": 2.4444444444444446,
+      "mrr_high_utility_mean": 1
+    },
+    "none": {
+      "ndcg_at_k_mean": 0.9080699563230694,
+      "useful_rate_at_k_mean": 0.9888888888888889,
+      "high_utility_rate_at_k_mean": 0.9888888888888889,
+      "noise_rate_at_k_mean": 0.011111111111111112,
+      "severe_error_rate_at_k_mean": 0.011111111111111112,
+      "relation_diversity_at_k_mean": 2.6666666666666665,
+      "mrr_high_utility_mean": 1
+    },
+    "omit": {
+      "ndcg_at_k_mean": 0.9069756716644876,
+      "useful_rate_at_k_mean": 0.9888888888888889,
+      "high_utility_rate_at_k_mean": 0.9888888888888889,
+      "noise_rate_at_k_mean": 0.011111111111111112,
+      "severe_error_rate_at_k_mean": 0.011111111111111112,
+      "relation_diversity_at_k_mean": 2.6666666666666665,
+      "mrr_high_utility_mean": 1
+    }
+  },
+  "production_contract": {
+    "category_mode": "omit",
+    "reason": "Runtime has no authoritative category; omission preserves or improves development metrics without synthetic category tokens."
+  }
+}
