@@ -472,6 +472,34 @@ Across `ฝน#1`, `โกรธ#1`, and `เดิน#1`:
 
 Early pattern: V2.5 consistently puts at least one high-utility result first and retrieves mostly useful vocabulary, while the main remaining weakness is how the rest of the top results are ordered and filtered. This continues to support V2.5 retrieval + learned writer-utility reranking.
 
+
+### Frozen checkpoint: สวย#1 — schema v3 baseline
+
+V2.5 top-10 after human annotation:
+
+- Useful@10: **10/10 (1.00)**
+- HighUtility@10: **10/10 (1.00)**
+- Noise@10: **0/10 (0.00)**
+- SevereError@10: **0/10 (0.00)**
+- relation diversity: **2**
+- NDCG@10: **1.0000000000**
+- MRR(first utility >= 2): **1.0**
+
+This is the first pilot query whose V2.5 top-10 ordering exactly matches the ideal utility ordering under the human labels.
+
+### Four-query pilot snapshot
+
+Across `ฝน#1`, `โกรธ#1`, `เดิน#1`, and `สวย#1`:
+
+- mean Useful@10: **0.925**
+- mean HighUtility@10: **0.850**
+- mean Noise@10 rate: **0.075**
+- mean SevereError@10 rate: **0.075**
+- mean NDCG@10: **0.8467790873**
+- MRR(first utility >= 2): **1.0 for all four**
+
+The widening spread from NDCG 0.589 to 1.000 reinforces that query difficulty is heterogeneous. Some lexical neighborhoods are already ordered nearly perfectly by V2.5, while broader scene/context-heavy concepts remain much harder.
+
 ## Phase 2 — Human-rated writer-relevance dataset
 
 After the revised annotation schema is ready:
