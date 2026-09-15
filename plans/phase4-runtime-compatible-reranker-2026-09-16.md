@@ -1,7 +1,7 @@
 # Thai Words — Phase 4 Runtime-Compatible Writer Reranker Plan
 
 Date: 2026-09-16  
-Status: **In progress — Waves A/B complete; Wave C neural runtime wrapper implemented**  
+Status: **In progress — Waves A/B/C complete; Wave D WriterSearch wrapper implemented**  
 Base commit: `959c502254529e7260fdbf98a615b0e4e7858145`  
 Working branch: `feat/phase4-runtime-compatible-reranker-2026-09-16`
 
@@ -719,3 +719,74 @@ print(ranker.warmup())        # loaded=true + load/device metadata
 Next implementation wave:
 
 > Wave D — combine V2.5, persisted learned scorer, and lazy neural scorer into `WriterSearch` with fixed alpha 0.5 and a strict top-30 candidate boundary.
+
+
+## Wave D implementation checkpoint — WriterSearch
+
+Implemented:
+
+- `thai_writer_search.py`
+  - `WriterSearch` wraps V2.5 without modifying `HybridSearcher`;
+  - loads persisted learned ranker via `LearnedWriterRanker.load()`;
+  - uses lazy `NeuralWriterRanker`;
+  - default and locked `rerank_pool=30`;
+  - fixed `alpha=0.5` enforced in code;
+  - uses the same average-rank normalization as Phase 3 via `scipy.stats.rankdata(method="average")`;
+  - learned and neural scores are normalized within the current query pool;
+  - hybrid score is `0.5 * learned_rank + 0.5 * neural_rank`;
+  - exact ties fall back to original V2.5 rank;
+  - cannot introduce candidates outside the V2.5 top-N pool;
+  - carries original V2.5 result metadata through to final results;
+  - adds writer-reranker diagnostics without requiring annotation fields.
+
+Diagnostic output fields include:
+
+- `final_rank`
+- `original_v25_rank`
+- `writer_hybrid_score`
+- `writer_learned_rank_score`
+- `writer_neural_rank_score`
+- `writer_learned_safe_score`
+- `writer_expected_utility`
+- `writer_severe_probability`
+- `writer_neural_score`
+- `writer_alpha`
+- `reranker_status=writer_reranked`
+
+The wrapper deliberately refuses any alpha other than **0.5**. A new alpha is a model-selection decision and requires a new holdout.
+
+- `tests/test_writer_search.py`
+  - fixed alpha guard;
+  - exact Phase 3 rank-normalization direction;
+  - average-rank ties;
+  - strict V2.5 pool boundary;
+  - equal locked blend;
+  - V2.5 rank tie-break;
+  - annotation-free runtime rows;
+  - diagnostic output;
+  - rerank-pool size guard.
+
+Expected runtime flow is now:
+
+```text
+query
+  -> HybridSearcher V2.5 top-30
+  -> runtime_row_from_v25_result
+  -> persisted LearnedWriterRanker
+  -> lazy NeuralWriterRanker
+  -> per-query average-rank normalization
+  -> alpha 0.5 blend
+  -> V2.5 tie-break
+  -> top-k
+```
+
+Recommended focused test:
+
+```bash
+python -m unittest discover \
+  -s tests \
+  -p 'test_writer_search.py' \
+  -v
+```
+
+After this passes, Wave E/F can add explicit `off / optional / required` fallback behavior and the separate `scripts/search_writer.py` CLI without altering V2.5's existing CLI.
