@@ -735,26 +735,26 @@ After the first Colab checkout, the research branch was squashed/force-updated w
 
 ### Phase-2 pre-annotation checkpoint
 
-Phase-2 assistant pre-annotation is now complete, but remains **provisional pending human review**.
+Phase-2 annotation review is complete and **approved**.
 
 Pre-annotation checkpoint:
 - 1,200 / 1,200 Phase-2 pairs labeled under schema v3;
 - 194 pairs flagged for high-priority human review;
 - full CSV and review-only CSV generated separately;
 - severe relations were checked to require utility 0;
-- no model training/model selection is allowed from these labels until review approval.
+- human review is complete; these labels are approved for Phase 3 development.
 
-Provisional top-10 means from the assistant labels:
+Approved Phase-2 top-10 means:
 - Useful@10 rate: **0.9375**
 - HighUtility@10 rate: **0.9000**
 - Noise@10 rate: **0.0625**
 - SevereError@10 rate: **0.0625**
-- NDCG@10: **0.9678623189**
+- NDCG@10: **0.8627717380**
 - MRR(first utility >= 2): **0.9875**
 
-These values are diagnostic only. They are **not** the frozen human benchmark metrics yet.
+NDCG uses the repository metric definition: ideal DCG is built from all 30 candidates, then evaluated at K=10. The earlier provisional top-10-only ideal calculation is superseded.
 
-Next step: human-review the 194 flagged pairs, apply any corrections, validate the complete 1,200-row file, then freeze the expanded benchmark before model selection.
+The reviewed labels are frozen; proceed to Phase 3 using train/validation only until a candidate is selected.
 
 
 ### Frozen 50-target checkpoint
