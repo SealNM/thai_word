@@ -1,6 +1,6 @@
 # V3 — Teacher Relation Dataset + EmbeddingGemma Fine-tuning
 
-Status: **in progress**
+Status: **paused / not promoted; V2.5 remains the baseline**
 Branch: `feat/dictionary-semantic-v3-teacher-finetune`
 Base: `feat/dictionary-semantic-v2-5-embeddinggemma`
 
@@ -141,3 +141,16 @@ Success criteria:
 - No reranker yet.
 - No automatic acceptance of teacher-invented words.
 - No production replacement of V2.5 until holdout evaluation passes.
+
+
+## Final project checkpoint
+
+V3 was not promoted.
+
+The later V3.1 local-teacher pilot demonstrated that high-confidence labels could still confuse near-synonym vs associated and subtype/supertype direction. Because those mistakes would become global embedding-space supervision, the project chose not to fine-tune the already-strong V2.5 EmbeddingGemma baseline with this dataset.
+
+See:
+- `feat/dictionary-semantic-v3-1-local-teacher-router`
+- `plans/semantic-search-research-summary-2026-09-15.md` on the V2.5 baseline branch.
+
+Decision: keep V3 code as research material; do not resume training without a safer human-reviewed dataset.
