@@ -1,5 +1,5 @@
 {
-  "status": "phase4_holdout_candidates_exported_unlabeled",
+  "status": "phase4_holdout_labels_frozen",
   "schema_version": 3,
   "target_file": "evaluation/writer_relevance_phase4_holdout_frozen_queries.json",
   "target_file_sha256": "f6c9fef35a556ecc306d67e42eea605ee85f804f21371595d22d1cca654fcd34",
@@ -29,6 +29,60 @@
   "candidate_file": "evaluation/writer_relevance_phase4_holdout_annotations.jsonl",
   "candidate_file_sha256": "93592bfaa38ade132f0699df856cd82e4c4f7e8c4dcf5f5f754073ed68d84328",
   "export_manifest_file": "evaluation/writer_relevance_phase4_holdout_export_manifest.json",
-  "labels_present": false,
-  "holdout_opened_for_model_evaluation": false
+  "labels_present": true,
+  "holdout_opened_for_model_evaluation": false,
+  "label_overlay_file": "evaluation/writer_relevance_phase4_holdout_labels.approved.json",
+  "label_overlay_sha256": "1029ba5808a0fa0eba3cb82d9faf2f292f365db4b1791c20a8172676c236f561",
+  "label_materializer_script": "scripts/writer_relevance_phase4_labels_materialize.py",
+  "approved_labels_materialized_file": "evaluation/writer_relevance_phase4_holdout_annotations.approved.jsonl",
+  "approved_labels_materialized_sha256": "7d719f22bf7834ab24bfacd91b3535871f05aa5db1e9273579e0e76a8f7c204c",
+  "approved_labels_pair_count": 600,
+  "approved_labels_query_count": 20,
+  "annotation_policy": {
+    "basis": "query meaning + candidate meaning + writer usefulness",
+    "candidate_order_randomized_for_annotation": true,
+    "writer_reranker_used_for_annotation": false,
+    "learned_neural_hybrid_outputs_used_for_annotation": false
+  },
+  "label_validation": {
+    "passed": true,
+    "error_count": 0,
+    "source_rows_unchanged_except_annotation": true,
+    "severe_error_utility_constraint_passed": true,
+    "query_count": 20,
+    "candidates_per_query": 30,
+    "pair_count": 600
+  },
+  "label_distribution": {
+    "utility": {
+      "0": 101,
+      "1": 111,
+      "2": 186,
+      "3": 202
+    },
+    "semantic_relation": {
+      "direct": 163,
+      "subtype": 101,
+      "broader_concept": 22,
+      "manner_action": 28,
+      "scene_context": 76,
+      "effect_state": 49,
+      "weak_related": 60,
+      "opposite_misleading": 6,
+      "sense_mismatch": 43,
+      "unrelated": 48,
+      "unclear": 4
+    },
+    "style_tags": {
+      "literary": 172,
+      "archaic": 87,
+      "formal": 16,
+      "colloquial": 41,
+      "technical": 29,
+      "dialect": 0,
+      "figurative": 47,
+      "other": 0,
+      "unknown": 0
+    }
+  }
 }

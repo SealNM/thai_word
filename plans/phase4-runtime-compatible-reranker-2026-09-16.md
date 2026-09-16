@@ -1,7 +1,7 @@
 # Thai Words — Phase 4 Runtime-Compatible Writer Reranker Plan
 
 Date: 2026-09-16  
-Status: **In progress — Waves A-G complete; Wave H 600 V2.5 pairs exported, annotation pending**  
+Status: **In progress — Waves A-G complete; Wave H labels frozen, model evaluation still closed**  
 Base commit: `959c502254529e7260fdbf98a615b0e4e7858145`  
 Working branch: `feat/phase4-runtime-compatible-reranker-2026-09-16`
 
@@ -1565,3 +1565,94 @@ Files to read first in the next chat:
 - uploaded `writer_relevance_phase4_holdout_annotations.jsonl`
 
 No PR has been opened. Opening any PR still requires explicit user approval.
+
+
+## Wave H label freeze complete — 600 / 600 pairs immutable
+
+Date: 2026-09-16
+
+The uploaded V2.5 candidate export was verified before annotation:
+
+- source SHA-256: `93592bfaa38ade132f0699df856cd82e4c4f7e8c4dcf5f5f754073ed68d84328`;
+- exactly **600** rows;
+- exactly **20** frozen query IDs;
+- exactly **30** V2.5 candidates per query;
+- all source labels were null before annotation.
+
+All 600 rows are now annotated under Writer Relevance schema v3.
+
+Annotation safeguards:
+
+- decisions used query meaning + candidate meaning + writer usefulness only;
+- candidate order was randomized during annotation review to reduce V2.5-rank bias;
+- learned/neural/hybrid writer-reranker output was not opened or used;
+- severe relations `opposite_misleading`, `sense_mismatch`, and `unrelated` all have utility **0**;
+- source row content is unchanged except for the annotation object;
+- validation completed with **0 errors**.
+
+### Frozen label representation
+
+To avoid committing a duplicate ~648 KB JSONL while keeping the result exactly reproducible, the canonical labels are stored as a source-hash-locked overlay:
+
+- `evaluation/writer_relevance_phase4_holdout_labels.approved.json`
+- overlay SHA-256: `1029ba5808a0fa0eba3cb82d9faf2f292f365db4b1791c20a8172676c236f561`
+
+Materializer:
+
+- `scripts/writer_relevance_phase4_labels_materialize.py`
+
+The materializer refuses a source file whose SHA differs from the frozen V2.5 export, applies all 600 labels, runs schema-v3 validation, writes the approved JSONL, and verifies the exact final hash.
+
+Expected materialized artifact:
+
+- `evaluation/writer_relevance_phase4_holdout_annotations.approved.jsonl`
+- SHA-256: `7d719f22bf7834ab24bfacd91b3535871f05aa5db1e9273579e0e76a8f7c204c`
+
+Run:
+
+```bash
+python scripts/writer_relevance_phase4_labels_materialize.py \
+  --source evaluation/writer_relevance_phase4_holdout_annotations.jsonl \
+  --labels evaluation/writer_relevance_phase4_holdout_labels.approved.json \
+  --output evaluation/writer_relevance_phase4_holdout_annotations.approved.jsonl
+```
+
+### Frozen label distribution
+
+Utility:
+
+- 3: **202**
+- 2: **186**
+- 1: **111**
+- 0: **101**
+
+Semantic relation:
+
+- direct: **163**
+- subtype: **101**
+- broader_concept: **22**
+- manner_action: **28**
+- scene_context: **76**
+- effect_state: **49**
+- weak_related: **60**
+- opposite_misleading: **6**
+- sense_mismatch: **43**
+- unrelated: **48**
+- unclear: **4**
+
+### Holdout gate remains closed
+
+The manifest intentionally remains:
+
+```text
+holdout_opened_for_model_evaluation = false
+```
+
+This commit is the immutable label boundary. Do not train, tune alpha, alter features, select candidates, or choose a model against this holdout before the boundary is fixed.
+
+Next controlled step:
+
+1. materialize and hash-check the approved JSONL;
+2. explicitly open the post-freeze evaluation gate in a separate step;
+3. evaluate frozen V2.5 and the already-frozen writer rerankers;
+4. record metrics without retraining, threshold tuning, alpha search, candidate reselection, or architecture changes on this holdout.
