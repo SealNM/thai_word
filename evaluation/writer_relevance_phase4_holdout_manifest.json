@@ -1,5 +1,5 @@
 {
-  "status": "phase4_holdout_post_freeze_evaluation_open",
+  "status": "phase4_holdout_reproduction_evaluation_complete",
   "schema_version": 3,
   "target_file": "evaluation/writer_relevance_phase4_holdout_frozen_queries.json",
   "target_file_sha256": "f6c9fef35a556ecc306d67e42eea605ee85f804f21371595d22d1cca654fcd34",
@@ -88,5 +88,73 @@
   "evaluation_gate_file": "evaluation/writer_relevance_phase4_evaluation_gate.json",
   "v25_baseline_summary_file": "evaluation/writer_relevance_phase4_v25_baseline_summary.json",
   "v25_baseline_summary_sha256": "bf6fd359c859d414f92d13d81ed18b719563f091cd9eb3740acb4db37bc856b9",
-  "model_evaluation_completed": false
+  "model_evaluation_completed": true,
+  "evaluation_count": 1,
+  "evaluation_closed_date": "2026-09-16",
+  "evaluation_summary_file": "evaluation/writer_relevance_phase4_holdout_evaluation_summary.json",
+  "evaluation_summary_sha256": "b54e7568bc1591e1abc256951cd2a95967f71bbc1461309ea43b38a9579d0c3e",
+  "exact_original_checkpoint_evaluation_completed": false,
+  "frozen_configuration_reproduction_evaluation_completed": true,
+  "post_holdout_tuning_performed": false,
+  "next_model_change_requires_new_holdout": true,
+  "artifact_recovery": {
+    "session_loss_occurred_before_evaluation": true,
+    "learned_ranker_rebuilt_from_frozen_training_dataset": true,
+    "neural_checkpoint_reproduced_from_frozen_phase3_configuration": true,
+    "neural_checkpoint_bit_identity_with_original_phase3_checkpoint_verified": false,
+    "training_dataset_sha256": "6e767583302a6df75c9b76d86fc73cbda150c98fbbe7c95b912a650a04a1a515",
+    "neural_base_model": "BAAI/bge-reranker-v2-m3",
+    "neural_training_config": {
+      "epochs": 1,
+      "batch_size": 2,
+      "eval_batch_size": 4,
+      "learning_rate": 0.00001,
+      "warmup_ratio": 0.1,
+      "max_length": 384,
+      "seed": 42,
+      "use_amp": true,
+      "training_split": "train"
+    },
+    "holdout_labels_used_for_training": false,
+    "holdout_results_used_to_change_configuration": false,
+    "interpretation": "This run evaluates a reproduction of the pre-registered Phase-3 configuration after artifact loss, not a byte-identical copy of the original Phase-3 neural checkpoint."
+  },
+  "evaluation_metrics": {
+    "v25": {
+      "useful_rate_at_k_mean": 0.915,
+      "high_utility_rate_at_k_mean": 0.795,
+      "noise_rate_at_k_mean": 0.085,
+      "severe_error_rate_at_k_mean": 0.085,
+      "relation_diversity_at_k_mean": 2.8,
+      "ndcg_at_k_mean": 0.7801111077355579,
+      "mrr_high_utility_mean": 0.9625
+    },
+    "learned_production": {
+      "useful_rate_at_k_mean": 0.915,
+      "high_utility_rate_at_k_mean": 0.81,
+      "noise_rate_at_k_mean": 0.085,
+      "severe_error_rate_at_k_mean": 0.085,
+      "relation_diversity_at_k_mean": 2.65,
+      "ndcg_at_k_mean": 0.7849198384345247,
+      "mrr_high_utility_mean": 0.925
+    },
+    "neural_production": {
+      "useful_rate_at_k_mean": 0.965,
+      "high_utility_rate_at_k_mean": 0.9,
+      "noise_rate_at_k_mean": 0.035,
+      "severe_error_rate_at_k_mean": 0.035,
+      "relation_diversity_at_k_mean": 3,
+      "ndcg_at_k_mean": 0.8787712493852295,
+      "mrr_high_utility_mean": 1
+    },
+    "locked_hybrid_production": {
+      "useful_rate_at_k_mean": 0.945,
+      "high_utility_rate_at_k_mean": 0.87,
+      "noise_rate_at_k_mean": 0.055,
+      "severe_error_rate_at_k_mean": 0.055,
+      "relation_diversity_at_k_mean": 2.65,
+      "ndcg_at_k_mean": 0.864456092969364,
+      "mrr_high_utility_mean": 1
+    }
+  }
 }

@@ -1,5 +1,5 @@
 {
-  "status": "phase4_post_freeze_evaluation_open",
+  "status": "phase4_post_freeze_reproduction_evaluation_complete",
   "opened_date": "2026-09-16",
   "label_boundary_commit": "2b5f398f0c5a7ac263e0bfd19ca4f0616870bedb",
   "dataset": {
@@ -50,5 +50,58 @@
   "v25_baseline_summary_file": "evaluation/writer_relevance_phase4_v25_baseline_summary.json",
   "result_file": "evaluation/writer_relevance_phase4_holdout_evaluation_report.json",
   "holdout_opened_for_model_evaluation": true,
-  "model_evaluation_completed": false
+  "model_evaluation_completed": true,
+  "closed_date": "2026-09-16",
+  "evaluation_count": 1,
+  "result_summary_file": "evaluation/writer_relevance_phase4_holdout_evaluation_summary.json",
+  "result_summary_sha256": "b54e7568bc1591e1abc256951cd2a95967f71bbc1461309ea43b38a9579d0c3e",
+  "raw_result_generated_in_kaggle": true,
+  "raw_result_archived_in_repo": false,
+  "exact_original_checkpoint_evaluation_completed": false,
+  "frozen_configuration_reproduction_evaluation_completed": true,
+  "closure": {
+    "no_post_holdout_tuning_performed": true,
+    "locked_hybrid_contract_changed": false,
+    "neural_only_selected": false,
+    "next_model_change_requires_new_holdout": true,
+    "artifact_recovery_deviation": "The exact Phase-3 neural checkpoint was unavailable after Kaggle session loss. Before holdout scoring, the neural checkpoint was reproduced from the already-frozen Phase-3 training configuration and the exact frozen training dataset. Holdout labels/results were not used for training or configuration changes. Binary identity with the original checkpoint is not verified."
+  },
+  "metrics": {
+    "v25": {
+      "useful_rate_at_k_mean": 0.915,
+      "high_utility_rate_at_k_mean": 0.795,
+      "noise_rate_at_k_mean": 0.085,
+      "severe_error_rate_at_k_mean": 0.085,
+      "relation_diversity_at_k_mean": 2.8,
+      "ndcg_at_k_mean": 0.7801111077355579,
+      "mrr_high_utility_mean": 0.9625
+    },
+    "learned_production": {
+      "useful_rate_at_k_mean": 0.915,
+      "high_utility_rate_at_k_mean": 0.81,
+      "noise_rate_at_k_mean": 0.085,
+      "severe_error_rate_at_k_mean": 0.085,
+      "relation_diversity_at_k_mean": 2.65,
+      "ndcg_at_k_mean": 0.7849198384345247,
+      "mrr_high_utility_mean": 0.925
+    },
+    "neural_production": {
+      "useful_rate_at_k_mean": 0.965,
+      "high_utility_rate_at_k_mean": 0.9,
+      "noise_rate_at_k_mean": 0.035,
+      "severe_error_rate_at_k_mean": 0.035,
+      "relation_diversity_at_k_mean": 3,
+      "ndcg_at_k_mean": 0.8787712493852295,
+      "mrr_high_utility_mean": 1
+    },
+    "locked_hybrid_production": {
+      "useful_rate_at_k_mean": 0.945,
+      "high_utility_rate_at_k_mean": 0.87,
+      "noise_rate_at_k_mean": 0.055,
+      "severe_error_rate_at_k_mean": 0.055,
+      "relation_diversity_at_k_mean": 2.65,
+      "ndcg_at_k_mean": 0.864456092969364,
+      "mrr_high_utility_mean": 1
+    }
+  }
 }

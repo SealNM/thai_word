@@ -1,7 +1,7 @@
 # Thai Words — Phase 4 Runtime-Compatible Writer Reranker Plan
 
 Date: 2026-09-16  
-Status: **In progress — Waves A-G complete; Wave H labels frozen, post-freeze evaluation gate open**  
+Status: **Wave H reproduction evaluation complete and closed; Waves A-G complete; Wave I not started**  
 Base commit: `959c502254529e7260fdbf98a615b0e4e7858145`  
 Working branch: `feat/phase4-runtime-compatible-reranker-2026-09-16`
 
@@ -1768,3 +1768,90 @@ python scripts/writer_relevance_phase4_holdout_eval.py \
 ```
 
 After that run, archive the resulting JSON without tuning from its result, update the manifest as evaluation-complete, and close this holdout cycle before considering any retraining/distillation/architecture iteration.
+
+## Wave H reproduction evaluation complete — holdout cycle closed
+
+Date: 2026-09-16
+
+The single controlled Phase-4 holdout evaluation completed on the exact frozen 20-query / 600-pair labeled holdout:
+
+- approved holdout SHA-256: `7d719f22bf7834ab24bfacd91b3535871f05aa5db1e9273579e0e76a8f7c204c`;
+- label boundary commit: `2b5f398f0c5a7ac263e0bfd19ca4f0616870bedb`;
+- category mode: `omit`;
+- alpha: **0.5**;
+- rerank pool: **30**;
+- evaluation count: **1**;
+- no threshold tuning, alpha search, candidate reselection, or architecture changes were performed from the holdout result.
+
+### Aggregate result at K=10
+
+| System | Useful | HighUtility | Noise | Severe | Diversity | NDCG | MRR |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| V2.5 | 0.915 | 0.795 | 0.085 | 0.085 | 2.80 | 0.780111 | 0.9625 |
+| Learned | 0.915 | 0.810 | 0.085 | 0.085 | 2.65 | 0.784920 | 0.9250 |
+| Neural | 0.965 | 0.900 | 0.035 | 0.035 | 3.00 | 0.878771 | 1.0000 |
+| Locked hybrid 0.5/0.5 | 0.945 | 0.870 | 0.055 | 0.055 | 2.65 | 0.864456 | 1.0000 |
+
+Locked hybrid vs V2.5:
+
+- Useful@10: **+0.030**;
+- HighUtility@10: **+0.075**;
+- Noise@10: **-0.030**;
+- SevereError@10: **-0.030**;
+- NDCG@10: **+0.084345**;
+- MRR high utility: **+0.0375**;
+- relation diversity: **-0.15**.
+
+Per-query NDCG for the locked hybrid vs V2.5:
+
+- wins: **12 / 20**;
+- ties: **3 / 20**;
+- losses: **5 / 20**;
+- largest gains: `หนัก#1`, `หวาน#1`, `หึง#1`, `เงา#1`, `เบา#1`;
+- largest regression: `ทะเล#1` (-0.138009 NDCG).
+
+### Neural-only observation is not a selection decision
+
+Neural-only is stronger than the locked hybrid in the aggregate Phase-4 metrics:
+
+- NDCG: **0.878771 vs 0.864456**;
+- Useful: **0.965 vs 0.945**;
+- HighUtility: **0.900 vs 0.870**;
+- Noise/Severe: **0.035 vs 0.055**;
+- diversity: **3.00 vs 2.65**.
+
+This observation **must not** be used to switch the product to neural-only from this holdout. Doing so would be post-holdout model selection. The locked alpha 0.5 contract remains unchanged for this completed evaluation cycle. Any future neural-only / alpha / model / distillation decision requires another fresh holdout.
+
+### Artifact-recovery caveat
+
+The Kaggle session containing the original external Phase-3 checkpoint was lost before this evaluation. The exact approved 50-query training data was restored by SHA, and the learned scorer was rebuilt deterministically. The neural checkpoint was then **reproduced from the already-frozen Phase-3 configuration**:
+
+- base model: `BAAI/bge-reranker-v2-m3`;
+- epochs: 1;
+- batch size: 2;
+- learning rate: 1e-5;
+- max length: 384;
+- seed: 42;
+- train split only.
+
+No Phase-4 holdout labels or results were used to train or change this configuration. However, the reproduced neural checkpoint is **not verified as byte-identical** to the original Phase-3 checkpoint because the original external artifact was unavailable and no binary checkpoint hash had been frozen.
+
+Therefore this result is recorded as:
+
+> **Phase-4 frozen-configuration reproduction evaluation**
+
+and not as proof of the exact original checkpoint binary.
+
+Compact immutable result:
+
+- `evaluation/writer_relevance_phase4_holdout_evaluation_summary.json`
+- SHA-256: `b54e7568bc1591e1abc256951cd2a95967f71bbc1461309ea43b38a9579d0c3e`
+
+The raw full evaluation JSON was generated in Kaggle as `evaluation/writer_relevance_phase4_holdout_evaluation_report.json`; the compact repo summary preserves the aggregate metrics, policy controls, artifact-recovery note, and per-query comparison counts.
+
+### Wave H closure
+
+Wave H is closed with no post-holdout tuning.
+
+Wave I has **not** started. If the next iteration changes the model or promotes neural-only, create a separately named production artifact and a new fresh holdout before making a new unbiased quality claim.
+

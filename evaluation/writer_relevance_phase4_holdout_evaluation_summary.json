@@ -1,0 +1,225 @@
+{
+  "schema_version": 1,
+  "status": "phase4_post_freeze_reproduction_evaluation_complete",
+  "date": "2026-09-16",
+  "source_report_status": "phase4_post_freeze_single_controlled_evaluation",
+  "input_sha256": "7d719f22bf7834ab24bfacd91b3535871f05aa5db1e9273579e0e76a8f7c204c",
+  "label_boundary_commit": "2b5f398f0c5a7ac263e0bfd19ca4f0616870bedb",
+  "evaluation_count": 1,
+  "runtime_contract": {
+    "category_mode": "omit",
+    "alpha": 0.5,
+    "rerank_pool": 30,
+    "normalization": "within_query_average_rank_0_to_1",
+    "tie_break": "original_v25_rank"
+  },
+  "metrics": {
+    "v25": {
+      "useful_rate_at_k_mean": 0.915,
+      "high_utility_rate_at_k_mean": 0.795,
+      "noise_rate_at_k_mean": 0.085,
+      "severe_error_rate_at_k_mean": 0.085,
+      "relation_diversity_at_k_mean": 2.8,
+      "ndcg_at_k_mean": 0.7801111077355579,
+      "mrr_high_utility_mean": 0.9625
+    },
+    "learned_production": {
+      "useful_rate_at_k_mean": 0.915,
+      "high_utility_rate_at_k_mean": 0.81,
+      "noise_rate_at_k_mean": 0.085,
+      "severe_error_rate_at_k_mean": 0.085,
+      "relation_diversity_at_k_mean": 2.65,
+      "ndcg_at_k_mean": 0.7849198384345247,
+      "mrr_high_utility_mean": 0.925
+    },
+    "neural_production": {
+      "useful_rate_at_k_mean": 0.965,
+      "high_utility_rate_at_k_mean": 0.9,
+      "noise_rate_at_k_mean": 0.035,
+      "severe_error_rate_at_k_mean": 0.035,
+      "relation_diversity_at_k_mean": 3,
+      "ndcg_at_k_mean": 0.8787712493852295,
+      "mrr_high_utility_mean": 1
+    },
+    "locked_hybrid_production": {
+      "useful_rate_at_k_mean": 0.945,
+      "high_utility_rate_at_k_mean": 0.87,
+      "noise_rate_at_k_mean": 0.055,
+      "severe_error_rate_at_k_mean": 0.055,
+      "relation_diversity_at_k_mean": 2.65,
+      "ndcg_at_k_mean": 0.864456092969364,
+      "mrr_high_utility_mean": 1
+    }
+  },
+  "deltas": {
+    "locked_hybrid_vs_v25": {
+      "useful_rate_at_k_mean": 0.03,
+      "high_utility_rate_at_k_mean": 0.075,
+      "noise_rate_at_k_mean": -0.03,
+      "severe_error_rate_at_k_mean": -0.03,
+      "relation_diversity_at_k_mean": -0.15,
+      "ndcg_at_k_mean": 0.08434498523380607,
+      "mrr_high_utility_mean": 0.0375
+    },
+    "locked_hybrid_vs_learned": {
+      "useful_rate_at_k_mean": 0.03,
+      "high_utility_rate_at_k_mean": 0.06,
+      "noise_rate_at_k_mean": -0.03,
+      "severe_error_rate_at_k_mean": -0.03,
+      "relation_diversity_at_k_mean": 0,
+      "ndcg_at_k_mean": 0.07953625453483926,
+      "mrr_high_utility_mean": 0.075
+    },
+    "locked_hybrid_vs_neural": {
+      "useful_rate_at_k_mean": -0.02,
+      "high_utility_rate_at_k_mean": -0.03,
+      "noise_rate_at_k_mean": 0.02,
+      "severe_error_rate_at_k_mean": 0.02,
+      "relation_diversity_at_k_mean": -0.35,
+      "ndcg_at_k_mean": -0.01431515641586556,
+      "mrr_high_utility_mean": 0
+    }
+  },
+  "per_query_ndcg": {
+    "locked_hybrid_vs_v25": {
+      "wins": 12,
+      "ties": 3,
+      "losses": 5,
+      "top_gains": [
+        {
+          "query_id": "หนัก#1",
+          "delta_ndcg": 0.4321848540497314
+        },
+        {
+          "query_id": "หวาน#1",
+          "delta_ndcg": 0.3164994629069344
+        },
+        {
+          "query_id": "หึง#1",
+          "delta_ndcg": 0.2228256370010071
+        },
+        {
+          "query_id": "เงา#1",
+          "delta_ndcg": 0.21884796851190258
+        },
+        {
+          "query_id": "เบา#1",
+          "delta_ndcg": 0.15586810089608538
+        }
+      ],
+      "largest_losses": [
+        {
+          "query_id": "ทะเล#1",
+          "delta_ndcg": -0.1380092620390121
+        },
+        {
+          "query_id": "หลบ#1",
+          "delta_ndcg": -0.04641675567115766
+        },
+        {
+          "query_id": "แห้ง#1",
+          "delta_ndcg": -0.003683865047431345
+        },
+        {
+          "query_id": "กังวล#1",
+          "delta_ndcg": -0.0028767696453231295
+        },
+        {
+          "query_id": "แม่น้ำ#1",
+          "delta_ndcg": -0.0016453224237559239
+        }
+      ]
+    },
+    "neural_vs_v25": {
+      "wins": 14,
+      "ties": 1,
+      "losses": 5
+    },
+    "neural_vs_locked_hybrid": {
+      "wins": 9,
+      "ties": 1,
+      "losses": 10,
+      "top_gains": [
+        {
+          "query_id": "หึง#1",
+          "delta_ndcg": 0.11879333145099313
+        },
+        {
+          "query_id": "หนัก#1",
+          "delta_ndcg": 0.10833717321122638
+        },
+        {
+          "query_id": "กังวล#1",
+          "delta_ndcg": 0.10768237264440894
+        },
+        {
+          "query_id": "หวาน#1",
+          "delta_ndcg": 0.09026288848629305
+        },
+        {
+          "query_id": "คิดถึง#1",
+          "delta_ndcg": 0.08206526800095071
+        }
+      ],
+      "largest_losses": [
+        {
+          "query_id": "เงา#1",
+          "delta_ndcg": -0.12211654208724199
+        },
+        {
+          "query_id": "หัน#1",
+          "delta_ndcg": -0.06913099309971216
+        },
+        {
+          "query_id": "ดอกไม้#2",
+          "delta_ndcg": -0.04811925869514344
+        },
+        {
+          "query_id": "ภูเขา#1",
+          "delta_ndcg": -0.03635473611368667
+        },
+        {
+          "query_id": "หวัง#1",
+          "delta_ndcg": -0.03635473611368667
+        }
+      ]
+    }
+  },
+  "evaluation_controls": {
+    "selection_performed_on_holdout": false,
+    "retraining_performed_during_evaluator": false,
+    "threshold_tuning_performed": false,
+    "alpha_search_performed": false,
+    "candidate_reselection_performed": false,
+    "architecture_change_performed": false
+  },
+  "artifact_recovery": {
+    "session_loss_occurred_before_evaluation": true,
+    "learned_ranker_rebuilt_from_frozen_training_dataset": true,
+    "neural_checkpoint_reproduced_from_frozen_phase3_configuration": true,
+    "neural_checkpoint_bit_identity_with_original_phase3_checkpoint_verified": false,
+    "training_dataset_sha256": "6e767583302a6df75c9b76d86fc73cbda150c98fbbe7c95b912a650a04a1a515",
+    "neural_base_model": "BAAI/bge-reranker-v2-m3",
+    "neural_training_config": {
+      "epochs": 1,
+      "batch_size": 2,
+      "eval_batch_size": 4,
+      "learning_rate": 0.00001,
+      "warmup_ratio": 0.1,
+      "max_length": 384,
+      "seed": 42,
+      "use_amp": true,
+      "training_split": "train"
+    },
+    "holdout_labels_used_for_training": false,
+    "holdout_results_used_to_change_configuration": false,
+    "interpretation": "This run evaluates a reproduction of the pre-registered Phase-3 configuration after artifact loss, not a byte-identical copy of the original Phase-3 neural checkpoint."
+  },
+  "decision_record": {
+    "locked_hybrid_contract_changed_after_holdout": false,
+    "neural_only_selected_from_holdout": false,
+    "observation": "Neural-only has stronger aggregate Phase-4 metrics than the locked hybrid in this reproduction run, but switching to neural-only from this holdout would be post-holdout model selection.",
+    "next_model_change_requires_new_holdout": true,
+    "wave_h_closed": true
+  }
+}
