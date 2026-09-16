@@ -7,6 +7,8 @@ import unittest
 from pathlib import Path
 
 from scripts.writer_relevance_phase5_historical_pool import (
+    SOURCE_50_FILE,
+    SOURCE_PHASE4_FILE,
     build_historical_pool,
     sha256_file,
 )
@@ -118,6 +120,10 @@ class Phase5HistoricalPoolTests(unittest.TestCase):
                 "writer_relevance_50",
                 "phase4_consumed_holdout",
             ],
+        )
+        self.assertEqual(
+            [row["phase5_provenance"]["source_file"] for row in combined],
+            [SOURCE_50_FILE, SOURCE_50_FILE, SOURCE_PHASE4_FILE],
         )
         for original, enriched in zip(originals, combined):
             stripped = dict(enriched)
