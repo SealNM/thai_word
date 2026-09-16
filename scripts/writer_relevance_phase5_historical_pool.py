@@ -13,6 +13,8 @@ from typing import Any
 from scripts.writer_relevance_phase4_labels_materialize import materialize
 from thai_substitutability import read_jsonl, validate_rows, write_jsonl
 
+SOURCE_50_FILE = "evaluation/writer_relevance_50_annotations.approved.jsonl"
+SOURCE_PHASE4_FILE = "evaluation/writer_relevance_phase4_holdout_annotations.approved.jsonl"
 SOURCE_50_SHA256 = "6e767583302a6df75c9b76d86fc73cbda150c98fbbe7c95b912a650a04a1a515"
 SOURCE_PHASE4_SHA256 = "7d719f22bf7834ab24bfacd91b3535871f05aa5db1e9273579e0e76a8f7c204c"
 SOURCE_50_QUERY_COUNT = 50
@@ -102,7 +104,7 @@ def _with_provenance(
     rows: list[dict[str, Any]],
     *,
     source_name: str,
-    source_file: Path,
+    source_file: str,
     source_sha256: str,
 ) -> list[dict[str, Any]]:
     enriched: list[dict[str, Any]] = []
@@ -115,7 +117,7 @@ def _with_provenance(
             )
         copied["phase5_provenance"] = {
             "source": source_name,
-            "source_file": str(source_file),
+            "source_file": source_file,
             "source_sha256": source_sha256,
         }
         enriched.append(copied)
@@ -197,14 +199,14 @@ def build_historical_pool(
     combined = _with_provenance(
         rows_50,
         source_name="writer_relevance_50",
-        source_file=source_50,
+        source_file=SOURCE_50_FILE,
         source_sha256=summary_50["actual_sha256"],
     )
     combined.extend(
         _with_provenance(
             rows_phase4,
             source_name="phase4_consumed_holdout",
-            source_file=source_phase4,
+            source_file=SOURCE_PHASE4_FILE,
             source_sha256=summary_phase4["actual_sha256"],
         )
     )
@@ -269,11 +271,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--source-50",
-        default="evaluation/writer_relevance_50_annotations.approved.jsonl",
+        default=SOURCE_50_FILE,
     )
     parser.add_argument(
         "--source-phase4",
-        default="evaluation/writer_relevance_phase4_holdout_annotations.approved.jsonl",
+        default=SOURCE_PHASE4_FILE,
     )
     parser.add_argument(
         "--phase4-candidate",
