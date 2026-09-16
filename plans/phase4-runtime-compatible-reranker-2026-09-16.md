@@ -1,7 +1,7 @@
 # Thai Words — Phase 4 Runtime-Compatible Writer Reranker Plan
 
 Date: 2026-09-16  
-Status: **Wave H reproduction evaluation complete and closed; Waves A-G complete; Wave I not started**  
+Status: **Phase 4 complete — Waves A-I closed; no post-holdout model promotion**  
 Base commit: `959c502254529e7260fdbf98a615b0e4e7858145`  
 Working branch: `feat/phase4-runtime-compatible-reranker-2026-09-16`
 
@@ -1854,4 +1854,61 @@ The raw full evaluation JSON was generated in Kaggle as `evaluation/writer_relev
 Wave H is closed with no post-holdout tuning.
 
 Wave I has **not** started. If the next iteration changes the model or promotes neural-only, create a separately named production artifact and a new fresh holdout before making a new unbiased quality claim.
+
+## Wave I complete — production artifact policy frozen
+
+Date: 2026-09-16
+
+Wave I closes Phase 4 without training or selecting another model from the consumed Phase-4 holdout.
+
+Implemented:
+
+- `evaluation/writer_relevance_artifact_registry.json`
+  - records the historical Phase-3 locked benchmark identity;
+  - records the Phase-4 checkpoint as a separate **reproduction** identity after session loss;
+  - records that the original Phase-3 binary is no longer available and no full checkpoint binary SHA-256 had been frozen;
+  - prevents the reproduction from inheriting the Phase-3 frozen benchmark metrics;
+  - leaves production status as `not_created`.
+
+- `thai_writer_artifact_policy.py`
+  - validates immutable benchmark naming;
+  - validates distinct reproduction naming;
+  - rejects claims that the reproduced checkpoint is the exact Phase-3 binary;
+  - reserves production names as `bge-reranker-v2-m3-production-v{N}`;
+  - requires every future production quality claim to use a fresh holdout;
+  - rejects reuse of the consumed Phase-4 holdout for future model selection.
+
+- `scripts/validate_writer_artifact_policy.py`
+  - validates the committed registry without loading model weights.
+
+- `tests/test_writer_artifact_policy.py`
+  - covers benchmark/reproduction identity separation;
+  - prevents inherited Phase-3 benchmark claims;
+  - enforces versioned production names;
+  - enforces a fresh holdout for future production quality claims.
+
+Important identity clarification:
+
+- historical benchmark artifact: `bge-reranker-v2-m3-locked`;
+- Phase-4 recovered/retrained binary: logical identity
+  `bge-reranker-v2-m3-reproduction-2026-09-16`;
+- the Kaggle evaluation temporarily used the old `bge-reranker-v2-m3-locked` directory name for compatibility with the pre-registered evaluator, but that path does **not** transfer the historical benchmark identity;
+- future production artifacts must use a new path such as
+  `bge-reranker-v2-m3-production-v1`.
+
+No `production-v1` model is created in this wave. Creating or promoting one now from the observed Phase-4 results would be post-holdout model selection.
+
+### Phase 4 final state
+
+- Waves **A-I complete**;
+- V2.5 retrieval remains unchanged;
+- category-free writer runtime exists;
+- learned/neural runtime artifacts are supported;
+- fixed-alpha writer reranking is implemented;
+- fallback/CLI/performance gates are implemented;
+- the fresh Phase-4 holdout is consumed and closed;
+- no post-holdout tuning or neural-only promotion was performed;
+- future model changes require a new fresh holdout.
+
+Phase 4 can now be closed. The next model-development cycle should start with a new plan/phase and a newly frozen holdout before comparing neural-only, another alpha, compression, distillation, or retraining choices.
 

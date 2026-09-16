@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "status": "phase4_wave_i_policy_complete",
+  "date": "2026-09-16",
+  "phase3_locked_benchmark": {
+    "artifact_id": "phase3-bge-reranker-v2-m3-locked",
+    "role": "benchmark_locked",
+    "canonical_dir_name": "bge-reranker-v2-m3-locked",
+    "base_model": "BAAI/bge-reranker-v2-m3",
+    "historical_checkpoint_verified": true,
+    "binary_hash_frozen": false,
+    "binary_sha256": null,
+    "current_original_binary_available": false,
+    "archived_metrics_file": "evaluation/writer_relevance_phase3_frozen_benchmark_summary.json",
+    "archived_metrics_apply_only_to_this_historical_artifact": true,
+    "notes": "The original external checkpoint was historically verified for Phase 3, but no full binary hash was frozen and the Kaggle session copy was later lost."
+  },
+  "phase4_reproduction": {
+    "artifact_id": "phase4-bge-reranker-v2-m3-reproduction-2026-09-16",
+    "role": "reproduction",
+    "canonical_dir_name": "bge-reranker-v2-m3-reproduction-2026-09-16",
+    "compatibility_dir_used_during_evaluation": "bge-reranker-v2-m3-locked",
+    "base_model": "BAAI/bge-reranker-v2-m3",
+    "training_dataset_sha256": "6e767583302a6df75c9b76d86fc73cbda150c98fbbe7c95b912a650a04a1a515",
+    "training_split": "train",
+    "configuration_source_file": "evaluation/writer_relevance_phase3_locked_candidate.json",
+    "exact_original_binary_verified": false,
+    "phase4_evaluation_summary_file": "evaluation/writer_relevance_phase4_holdout_evaluation_summary.json",
+    "phase4_evaluation_summary_sha256": "b54e7568bc1591e1abc256951cd2a95967f71bbc1461309ea43b38a9579d0c3e",
+    "may_claim_phase3_frozen_metrics": false,
+    "may_be_presented_as_exact_phase3_checkpoint": false,
+    "notes": "The Phase-4 run reproduced the already-frozen Phase-3 configuration after artifact loss. The compatibility directory name used by the evaluator does not transfer the historical benchmark identity."
+  },
+  "production_policy": {
+    "status": "not_created",
+    "name_pattern": "bge-reranker-v2-m3-production-v{N}",
+    "active_artifact_name": null,
+    "must_use_distinct_artifact_id_and_path": true,
+    "may_claim_phase3_frozen_metrics": false,
+    "requires_fresh_holdout_for_quality_claim": true,
+    "must_not_use_phase4_consumed_holdout_for_selection": true,
+    "notes": "Wave I defines the production artifact contract only. No new production model is selected or trained from the consumed Phase-4 holdout."
+  }
+}
