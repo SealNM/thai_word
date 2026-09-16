@@ -1485,3 +1485,83 @@ python -m scripts.substitutability_benchmark validate \
 ```
 
 Only after full validation passes should the labeled holdout be frozen under a new SHA-256 and opened for a single controlled model-selection cycle.
+
+
+## Chat handoff checkpoint — Phase 4 holdout annotation next
+
+Date: 2026-09-16
+
+Current branch:
+
+```text
+feat/phase4-runtime-compatible-reranker-2026-09-16
+```
+
+Current completed state:
+
+- Waves **A-G complete**;
+- Wave H target headwords frozen;
+- all 20 target senses reviewed and frozen;
+- zero headword overlap with the original 50-query dataset;
+- V2.5 dense artifact rebuilt with `embeddinggemma-300m-256`;
+- exactly **600 unlabeled holdout pairs** exported from V2.5 only;
+- candidate export locked in manifest;
+- writer learned/neural/hybrid rerankers have **not** been used to inspect or score the new holdout;
+- no quality selection has been performed on the new holdout.
+
+Canonical frozen target SHA-256:
+
+```text
+f6c9fef35a556ecc306d67e42eea605ee85f804f21371595d22d1cca654fcd34
+```
+
+Canonical 600-pair candidate-file SHA-256:
+
+```text
+93592bfaa38ade132f0699df856cd82e4c4f7e8c4dcf5f5f754073ed68d84328
+```
+
+Expected candidate file from Kaggle:
+
+```text
+evaluation/writer_relevance_phase4_holdout_annotations.jsonl
+```
+
+Important handoff note:
+
+> Kaggle's interactive annotation CLI is not convenient for the user because it requires typing into the notebook terminal. The next chat should therefore continue by having the user upload the generated `writer_relevance_phase4_holdout_annotations.jsonl` file directly to ChatGPT.
+
+Once that file is uploaded, the next implementation task is:
+
+1. verify its SHA-256 equals
+   `93592bfaa38ade132f0699df856cd82e4c4f7e8c4dcf5f5f754073ed68d84328`;
+2. verify it contains exactly **600 rows**, **20 query IDs**, and **30 V2.5 candidates per query**;
+3. annotate all rows using Writer Relevance schema v3:
+   - `utility`: 0..3;
+   - `semantic_relation`;
+   - `style_tags`;
+   - optional concise notes only where useful;
+4. annotation must be based on query meaning + candidate meaning + writer usefulness only;
+5. do **not** use learned/neural/hybrid scores or rankings to assist annotation;
+6. enforce severe relations
+   `opposite_misleading`, `sense_mismatch`, `unrelated`
+   => utility **0**;
+7. validate all 600 labeled rows;
+8. create a separate approved/frozen labeled holdout artifact with a new SHA-256;
+9. update the holdout manifest:
+   - `labels_present=true`;
+   - record labeled-file SHA-256;
+   - keep `holdout_opened_for_model_evaluation=false` until validation/freeze completes;
+10. only after the labeled holdout is frozen should the model-comparison/evaluation step be opened.
+
+Do not ask the user to repeat the Phase 4 setup in the next chat; this checkpoint is the authoritative continuation point.
+
+Files to read first in the next chat:
+
+- `plans/phase4-runtime-compatible-reranker-2026-09-16.md`
+- `evaluation/writer_relevance_phase4_holdout_manifest.json`
+- `evaluation/writer_relevance_phase4_holdout_export_manifest.json`
+- `evaluation/writer_relevance_phase4_holdout_frozen_queries.json`
+- uploaded `writer_relevance_phase4_holdout_annotations.jsonl`
+
+No PR has been opened. Opening any PR still requires explicit user approval.
