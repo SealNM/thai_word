@@ -1,7 +1,7 @@
 # Thai Words — Phase 5 Production-v1 Plan
 
 Date: 2026-09-16  
-Status: **Planned — not started**  
+Status: **In progress — Wave A source recovery / historical-pool build**  
 Base commit: `3dbe3a0bc8b58a7361c75f99546d71d527767271`  
 Planning branch: `plan/phase5-production-v1-2026-09-16`
 
@@ -718,3 +718,44 @@ The 50-query approved JSONL is not guaranteed to exist in Git and may need to be
 - persist/hash the final Production-v1 artifact before opening the Phase-5 acceptance holdout.
 
 No PR is opened as part of this planning branch.
+
+
+---
+
+# Wave A implementation checkpoint — 2026-09-16
+
+Implementation branch:
+
+```text
+feat/phase5-wave-a-historical-70-2026-09-16
+```
+
+Completed in the implementation branch:
+
+- added `scripts/writer_relevance_phase5_historical_pool.py`;
+- source SHA-256 is verified before data is accepted;
+- Writer Relevance schema v3 and severe-error/utility constraints are validated;
+- 50-query and Phase-4 query IDs are required to be disjoint;
+- source pair/query counts are frozen at 1500/50 and 600/20;
+- combined target is frozen at 2100 pairs / 70 unique queries;
+- original query/candidate/annotation payloads are preserved and Phase-5 source provenance is added per row;
+- combined JSONL and manifest are written only after validation passes;
+- added focused unit tests for provenance preservation, duplicate-query rejection, hash mismatch, severe-error validation, and historical-policy metadata.
+
+Source recovery still required before Wave A can be accepted:
+
+1. `evaluation/writer_relevance_50_annotations.approved.jsonl`
+   - expected SHA-256: `6e767583302a6df75c9b76d86fc73cbda150c98fbbe7c95b912a650a04a1a515`
+   - expected: 50 unique query IDs / 1500 pairs.
+2. Exact Phase-4 source material:
+   - preferred approved file: `evaluation/writer_relevance_phase4_holdout_annotations.approved.jsonl`
+   - expected SHA-256: `7d719f22bf7834ab24bfacd91b3535871f05aa5db1e9273579e0e76a8f7c204c`
+   - or the frozen unlabeled candidate source
+     `evaluation/writer_relevance_phase4_holdout_annotations.jsonl`
+     with SHA-256
+     `93592bfaa38ade132f0699df856cd82e4c4f7e8c4dcf5f5f754073ed68d84328`;
+     the approved label overlay is already committed and the existing materializer must reproduce the approved SHA exactly.
+
+Do not proceed to Wave B until the real sources have been restored, the 70-query artifact has been materialized, and its combined SHA has been frozen.
+
+No Phase-5 fresh acceptance holdout has been opened, and no Production-v1 recipe/model selection has been performed.
