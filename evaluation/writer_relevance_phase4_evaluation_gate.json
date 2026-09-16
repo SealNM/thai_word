@@ -1,0 +1,54 @@
+{
+  "status": "phase4_post_freeze_evaluation_open",
+  "opened_date": "2026-09-16",
+  "label_boundary_commit": "2b5f398f0c5a7ac263e0bfd19ca4f0616870bedb",
+  "dataset": {
+    "file": "evaluation/writer_relevance_phase4_holdout_annotations.approved.jsonl",
+    "sha256": "7d719f22bf7834ab24bfacd91b3535871f05aa5db1e9273579e0e76a8f7c204c",
+    "query_count": 20,
+    "pair_count": 600
+  },
+  "label_overlay": {
+    "file": "evaluation/writer_relevance_phase4_holdout_labels.approved.json",
+    "sha256": "1029ba5808a0fa0eba3cb82d9faf2f292f365db4b1791c20a8172676c236f561"
+  },
+  "phase3_locked_candidate": {
+    "file": "evaluation/writer_relevance_phase3_locked_candidate.json",
+    "git_blob_sha1": "7dd0796bd9ef8d719f0febdb62342cb6dbb01d17",
+    "checkpoint_dir_name": "bge-reranker-v2-m3-locked"
+  },
+  "runtime_contract": {
+    "category_mode": "omit",
+    "alpha": 0.5,
+    "rerank_pool": 30,
+    "normalization": "within_query_average_rank_0_to_1",
+    "tie_break": "original_v25_rank"
+  },
+  "learned_artifact": {
+    "training_dataset_sha256": "6e767583302a6df75c9b76d86fc73cbda150c98fbbe7c95b912a650a04a1a515",
+    "category_mode": "omit",
+    "seed": 42,
+    "severe_penalty": 1,
+    "train_pair_count": 930,
+    "train_query_count": 31
+  },
+  "neural_artifact": {
+    "base_model": "BAAI/bge-reranker-v2-m3",
+    "checkpoint_dir_name": "bge-reranker-v2-m3-locked",
+    "max_length": 384,
+    "eval_batch_size": 4,
+    "allow_download": false
+  },
+  "policy": {
+    "no_retraining": true,
+    "no_threshold_tuning": true,
+    "no_alpha_search": true,
+    "no_candidate_reselection": true,
+    "no_architecture_change": true,
+    "single_controlled_evaluation_cycle": true
+  },
+  "v25_baseline_summary_file": "evaluation/writer_relevance_phase4_v25_baseline_summary.json",
+  "result_file": "evaluation/writer_relevance_phase4_holdout_evaluation_report.json",
+  "holdout_opened_for_model_evaluation": true,
+  "model_evaluation_completed": false
+}

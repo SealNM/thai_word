@@ -1,7 +1,7 @@
 # Thai Words — Phase 4 Runtime-Compatible Writer Reranker Plan
 
 Date: 2026-09-16  
-Status: **In progress — Waves A-G complete; Wave H labels frozen, model evaluation still closed**  
+Status: **In progress — Waves A-G complete; Wave H labels frozen, post-freeze evaluation gate open**  
 Base commit: `959c502254529e7260fdbf98a615b0e4e7858145`  
 Working branch: `feat/phase4-runtime-compatible-reranker-2026-09-16`
 
@@ -1656,3 +1656,115 @@ Next controlled step:
 2. explicitly open the post-freeze evaluation gate in a separate step;
 3. evaluate frozen V2.5 and the already-frozen writer rerankers;
 4. record metrics without retraining, threshold tuning, alpha search, candidate reselection, or architecture changes on this holdout.
+
+
+## Wave H post-freeze evaluation gate opened — 2026-09-16
+
+Label boundary commit:
+
+```text
+2b5f398f0c5a7ac263e0bfd19ca4f0616870bedb
+```
+
+The 600-pair Phase-4 holdout remains immutable at:
+
+- approved JSONL SHA-256: `7d719f22bf7834ab24bfacd91b3535871f05aa5db1e9273579e0e76a8f7c204c`;
+- label overlay SHA-256: `1029ba5808a0fa0eba3cb82d9faf2f292f365db4b1791c20a8172676c236f561`.
+
+The evaluation gate is now explicitly open in:
+
+- `evaluation/writer_relevance_phase4_evaluation_gate.json`.
+
+The gate locks:
+
+- category mode = `omit`;
+- alpha = **0.5**;
+- rerank pool = **30**;
+- normalization = within-query average rank;
+- tie-break = original V2.5 rank;
+- learned artifact training source / seed / severe penalty;
+- the exact Phase-3 locked-candidate manifest Git blob;
+- the saved `bge-reranker-v2-m3-locked` checkpoint identity.
+
+Policy remains:
+
+- no retraining;
+- no threshold tuning;
+- no alpha search;
+- no candidate reselection;
+- no architecture changes;
+- one controlled evaluation cycle only.
+
+### V2.5 baseline recorded before writer-reranker output was opened
+
+On the frozen 20-query / 600-pair holdout at K=10:
+
+- Useful@10: **0.915**
+- HighUtility@10: **0.795**
+- Noise@10: **0.085**
+- SevereError@10: **0.085**
+- relation diversity: **2.8**
+- NDCG@10: **0.7801111077355579**
+- MRR high utility: **0.9625**
+
+Archived in:
+
+- `evaluation/writer_relevance_phase4_v25_baseline_summary.json`
+
+with SHA-256:
+
+```text
+bf6fd359c859d414f92d13d81ed18b719563f091cd9eb3740acb4db37bc856b9
+```
+
+No learned, neural, or hybrid Phase-4 result has been inspected yet.
+
+### One-shot evaluator
+
+Added:
+
+- `scripts/writer_relevance_phase4_holdout_eval.py`
+- `tests/test_writer_relevance_phase4_holdout_eval.py`
+
+The evaluator scores the **exact frozen 600-candidate pool** instead of rerunning retrieval. This prevents candidate drift from being mixed into the reranker comparison.
+
+Before reading/scoring the holdout it requires:
+
+- explicit `--confirm-phase4-holdout`;
+- exact approved-dataset SHA;
+- exact Phase-3 manifest Git blob;
+- learned-artifact metadata match;
+- fixed alpha / pool / category contract;
+- all no-tuning policy flags.
+
+Focused gate/runtime tests passed before this checkpoint.
+
+### Single controlled Kaggle run
+
+Materialize the approved JSONL if needed:
+
+```bash
+python scripts/writer_relevance_phase4_labels_materialize.py \
+  --source evaluation/writer_relevance_phase4_holdout_annotations.jsonl \
+  --labels evaluation/writer_relevance_phase4_holdout_labels.approved.json \
+  --output evaluation/writer_relevance_phase4_holdout_annotations.approved.jsonl
+```
+
+Then run exactly one controlled evaluation:
+
+```bash
+python scripts/writer_relevance_phase4_holdout_eval.py \
+  --input evaluation/writer_relevance_phase4_holdout_annotations.approved.jsonl \
+  --gate evaluation/writer_relevance_phase4_evaluation_gate.json \
+  --phase3-manifest evaluation/writer_relevance_phase3_locked_candidate.json \
+  --learned-ranker artifacts/writer-reranker \
+  --neural-model artifacts/phase3/bge-reranker-v2-m3-locked \
+  --device cuda \
+  --eval-batch-size 4 \
+  --k 10 \
+  --include-per-query \
+  --output evaluation/writer_relevance_phase4_holdout_evaluation_report.json \
+  --confirm-phase4-holdout
+```
+
+After that run, archive the resulting JSON without tuning from its result, update the manifest as evaluation-complete, and close this holdout cycle before considering any retraining/distillation/architecture iteration.

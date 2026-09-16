@@ -1,5 +1,5 @@
 {
-  "status": "phase4_holdout_labels_frozen",
+  "status": "phase4_holdout_post_freeze_evaluation_open",
   "schema_version": 3,
   "target_file": "evaluation/writer_relevance_phase4_holdout_frozen_queries.json",
   "target_file_sha256": "f6c9fef35a556ecc306d67e42eea605ee85f804f21371595d22d1cca654fcd34",
@@ -30,7 +30,7 @@
   "candidate_file_sha256": "93592bfaa38ade132f0699df856cd82e4c4f7e8c4dcf5f5f754073ed68d84328",
   "export_manifest_file": "evaluation/writer_relevance_phase4_holdout_export_manifest.json",
   "labels_present": true,
-  "holdout_opened_for_model_evaluation": false,
+  "holdout_opened_for_model_evaluation": true,
   "label_overlay_file": "evaluation/writer_relevance_phase4_holdout_labels.approved.json",
   "label_overlay_sha256": "1029ba5808a0fa0eba3cb82d9faf2f292f365db4b1791c20a8172676c236f561",
   "label_materializer_script": "scripts/writer_relevance_phase4_labels_materialize.py",
@@ -84,5 +84,9 @@
       "other": 0,
       "unknown": 0
     }
-  }
+  },
+  "evaluation_gate_file": "evaluation/writer_relevance_phase4_evaluation_gate.json",
+  "v25_baseline_summary_file": "evaluation/writer_relevance_phase4_v25_baseline_summary.json",
+  "v25_baseline_summary_sha256": "bf6fd359c859d414f92d13d81ed18b719563f091cd9eb3740acb4db37bc856b9",
+  "model_evaluation_completed": false
 }
